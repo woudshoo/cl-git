@@ -546,12 +546,12 @@
 (cffi:defcstruct git-remote
   )
 
-(cffi:defcstruct git-remote-head
-  ;;; Skipping field #<FIELD local> in #<STRUCT
-                                         git_remote_head> because it has a bitfield type which is not yet supported by CFFI! Check the layout manually!
+(defbitfield git-local
+    (:false #x0000)
+    :true)
 
-  ;;; Encountered a field while the previous bitfield typed fields do not add up to 32 or 64 bits. The fields offsets will be wrong in #<STRUCT
-                                                                                                                                         git_remote_head>!
+(cffi:defcstruct git-remote-head
+  (local git-local)
   (oid git-oid)
   (loid git-oid)
   (name (:pointer :char)))
