@@ -4,7 +4,7 @@
   :description "A CFFI wrapper of libgit2."
   :version "0.0.1"
   :serial t
-  :depends-on (#:cffi #:local-time)
+  :depends-on (#:cffi #:local-time #:alexandria #:verrazano)
   :author "Russell Sim <russell.sim@gmail.com>"
   :licence "Lisp-LGPL"
   :components ((:file "package")
@@ -13,3 +13,7 @@
 (asdf:defsystem #:cl-git.tests
   :depends-on (#:cl-git #:FiveAM #:cl-fad)
   :components ((:file "tests")))
+
+(asdf:defsystem #:libgit2
+  :depends-on (#:cffi)
+  :components ((:file "libgit2")))
