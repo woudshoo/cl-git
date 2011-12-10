@@ -14,5 +14,16 @@
    #:git-reference-listall
    #:with-git-repository
    #:ensure-git-repository-exist
-))
+   ))
 
+
+
+(defpackage :cl-git-user
+  (:use
+   :common-lisp
+   :verrazano
+   :iterate
+   :alexandria
+   :metabang-bind
+   :cffi
+   ))
