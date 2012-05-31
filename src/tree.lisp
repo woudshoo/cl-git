@@ -31,11 +31,6 @@
   (:actual-type :pointer)
   (:simple-parser %tree-entry))
 
-(define-foreign-type tree (object)
-  nil
-  (:actual-type :pointer)
-  (:simple-parser %tree))
-
 (defcstruct git-tree-entry
   (attr :unsigned-int)
   (filename :string)
@@ -51,18 +46,18 @@
 (defcfun ("git_tree_id" git-tree-oid)
     %oid
   "Returns the oid of the tree."
-  (tree %tree))
+  (tree (%object :type :tree)))
 
 (defcfun ("git_tree_entrycount" git-tree-entry-count)
     :unsigned-int
   "Returns the number of tree entries in the tree object.
 This does count the number of direct children, not recursively."
-  (tree %tree))
+  (tree (%object :type :tree)))
 
 (defcfun ("git_tree_entry_byindex" git-tree-entry-by-index)
     %tree-entry
   "Returns the tree entry at index"
-  (tree %tree)
+  (tree (%object :type :tree))
   (index :unsigned-int))
 
 
@@ -85,6 +80,8 @@ This does count the number of direct children, not recursively."
 ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defclass tree (object)
+  nil)
 
 (defun git-tree-lookup (oid)
   "Lookup a Git tree object."

@@ -26,34 +26,28 @@
 ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
-(define-foreign-type tag (object)
-  nil
-  (:actual-type :pointer)
-  (:simple-parser %tag))
-
 (defcfun ("git_tag_type" git-tag-type)
     git-object-type
-  (tag %tag))
+  (tag (%object :type :tag)))
 
 (defcfun ("git_tag_target" %git-tag-target)
     %return-value
   (reference :pointer)
-  (tag %tag))
+  (tag (%object :type :tag)))
 
 (defcfun ("git_tag_tagger" git-tag-tagger)
     %git-signature
-  (tag %tag))
+  (tag (%object :type :tag)))
 
 (defcfun ("git_tag_name" git-tag-name)
     :string
   "Returns the name of the tag"
-  (tag %tag))
+  (tag (%object :type :tag)))
 
 (defcfun ("git_tag_message" git-tag-message)
     :string
   "Returns the message of the tag"
-  (tag %tag))
+  (tag (%object :type :tag)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -62,6 +56,8 @@
 ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defclass tag (object)
+  nil)
 
 (defmethod tag-name ((tag tag))
   (git-tag-name tag))

@@ -26,12 +26,12 @@
 ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define-foreign-type object-type ()
+  ((git-type :reader git-type :initarg :git-type))
+  (:actual-type :pointer))
 
-(define-foreign-type object ()
-  ((%object :accessor pointer :initarg :pointer :initform (null-pointer))
-   (%repository :accessor %repository :initarg :repository-pointer))
-  (:actual-type :pointer)
-  (:simple-parser %object))
+(define-parse-method %object (&key (type :any))
+  (make-instance 'object-type :git-type type))
 
 (defcenum git-object-type
   (:any -2)       ; Object can be any of the following
@@ -63,7 +63,7 @@
 (defcfun ("git_object_free" git-object-free)
     :void
   "Free the git object."
-  (object :pointer))
+  (object %object))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -72,12 +72,42 @@
 ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defclass object ()
+  ((%object :accessor pointer :initarg :pointer :initform (null-pointer))
+   (%repository :accessor %repository :initarg :repository-pointer)))
 
-(defmethod translate-to-foreign (value (type object))
+(defmethod translate-to-foreign (value (type object-type))
+  "No-op translation in case the value is already a cffi pointer"
   (if (pointerp value)
       value
-      (pointer value)))
+      (error "Cannot convert object ~S to C-pointer to git object" value)))
 
+(defmethod translate-to-foreign ((value object) (type object-type))
+  "Converts the value to a cffi pointer.  Note that rudimentary libgit type checking is done.
+If the type of the `object' is known and the type specifier `type' requires a specific
+type, the types are checked for compatibility."
+  (pointer value))
+
+(defmethod translate-from-foreign (value (type object-type))
+  "Convers a pointer to a libgit type to a CLOS instance wrapping this pointer.
+If the `type' specifier is :any, an additional call into libgit will be made
+to get the actual type of the git object.  If the libgit type is specified in `type'
+no extra call will be made.
+
+The CLOS object has a finalize method to free the libgit underlying object."
+  (let* ((git-type (git-type type))
+	 (obj-type (case (or (unless (eq git-type :any) git-type
+			       (git-object-type value)))
+		     (:commit 'commit)
+		     (:tag 'tag)
+		     (:tree 'tree)
+		     (t 'object)))
+	 (object (make-instance obj-type
+				:pointer value
+				:repository-pointer *git-repository*)))
+    (finalize object (lambda ()
+		       (git-object-free value)))
+    object))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -86,7 +116,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defun make-instance-object (&key object-ptr repository-ptr type)
+#+nil (defun make-instance-object (&key object-ptr (repository-ptr *git-repository*) type)
   (let* ((obj-type (case (or (unless (eq type :any) type)
                              (git-object-type object-ptr))
                      (:commit 'commit)
@@ -95,12 +125,10 @@
                      (t 'object)))
          (object (make-instance obj-type
                                 :pointer object-ptr
-                                :repository-pointer (or repository-ptr *git-repository*))))
-    (with-foreign-object (finalizer-ptr :pointer)
-      (setf finalizer-ptr object-ptr)
-      (finalize object
-                (lambda ()
-                  (git-object-free finalizer-ptr))))
+                                :repository-pointer repository-ptr)))
+    (finalize object
+	      (lambda ()
+		(git-object-free object-ptr)))
     object))
 
 (defun git-object-lookup (oid type)
@@ -110,12 +138,10 @@ object is not of the right type, an error will be signaled.  The type
 is one of :any, :bad, :commit :tree :blob :tag :ofs_delta :refs_delta.
 :any and :bad are special cases.  :any means return the object found,
 do not do a typecheck and is a valid type, but should typically not
-occur.
-
-Note that the returned git object should be freed with git-object-free."
+occur."
 
   (assert (not (null-or-nullpointer *git-repository*)))
 
   (with-foreign-object (obj-ptr :pointer)
     (%git-object-lookup obj-ptr *git-repository* oid type)
-    (make-instance-object :object-ptr (mem-ref obj-ptr :pointer))))
+    (convert-from-foreign (mem-ref obj-ptr :pointer) '(%object :type type))))

@@ -27,11 +27,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(define-foreign-type commit (object)
-  nil
-  (:actual-type :pointer)
-  (:simple-parser %commit))
-
 (defcfun ("git_commit_create" %git-commit-create)
     %return-value
   (oid :pointer)
@@ -41,41 +36,41 @@
   (committer %git-signature)
   (message-encoding :pointer)
   (message :pointer)
-  (tree %tree)
+  (tree (%object :type :tree))
   (parent-count :int)
   (parents :pointer))
 
 (defcfun ("git_commit_message" git-commit-message)
     :string
   "Return a string containing the commit message."
-  (commit %commit))
+  (commit %object))
 
 (defcfun ("git_commit_author" git-commit-author)
     %git-signature
   "Given a commit return the commit author's signature."
-  (commit %commit))
+  (commit %object))
 
 (defcfun ("git_commit_committer" git-commit-committer)
     %git-signature
   "Given a commit return the commit committer's signature."
-  (commit %commit))
+  (commit %object))
 
 (defcfun ("git_commit_parentcount" git-commit-parentcount)
     :int
   "Returns the number of parent commits of the argument."
-  (commit %commit))
+  (commit %object))
 
 (defcfun ("git_commit_parent_oid" git-commit-parent-oid)
     %oid
   "Returns the oid of the parent with index `parent-index' in the list
 of parents of the commit `commit'."
-  (commit %commit)
+  (commit %object)
   (n :int))
 
 (defcfun ("git_commit_tree" %git-commit-tree)
     %return-value
   (tree-out :pointer)
-  (commit %commit))
+  (commit %object))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -83,7 +78,8 @@ of parents of the commit `commit'."
 ;;; Highlevel Interface
 ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+(defclass commit (object)
+  nil)
 
 (defun make-commit (oid message &key
                                   (update-ref "HEAD")
@@ -113,8 +109,8 @@ PARENTS is an optional list of parent commits sha1 hashes."
                                     (%message-encoding "UTF-8")
                                     (%update-ref update-ref))
                (loop :for parent :in parents
-                     :counting parent :into i
-                     :do (setf (mem-aref %parents :pointer (1- i)) (translate-to-foreign parent parent)))
+		  :counting parent :into i
+		  :do (setf (mem-aref %parents :pointer (1- i)) (cffi:convert-to-foreign parent '(%object :type :commit))))
                (%git-commit-create
                 newoid
                 *git-repository*
@@ -154,8 +150,8 @@ parents of the commit `commit'."
   "Returns the tree object of the commit."
   (with-foreign-object (%tree :pointer)
     (%git-commit-tree %tree commit)
-    (make-instance-object :object-ptr (mem-aref %tree :pointer)
-                          :type :tree)))
+    (convert-from-foreign (mem-aref %tree :pointer)
+			  '(%object :type :tree))))
 
 (defmethod commit-parent-oids ((commit commit))
   "Returns a list of oids identifying the parent commits of `commit'."
