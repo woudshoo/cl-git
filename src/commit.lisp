@@ -156,7 +156,7 @@ parents of the commit `commit'."
 (defmethod commit-parent-oids ((commit commit))
   "Returns a list of oids identifying the parent commits of `commit'."
   (loop
-    :for index :from 0 :below (git-commit-parent-count commit)
+    :for index :from 0 :below (git-commit-parentcount commit)
     :collect (git-commit-parent-oid commit index)))
 
 (defun git-commit-lookup (oid)
