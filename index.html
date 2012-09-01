@@ -1,0 +1,833 @@
+<html lang="en">
+<head>
+<title>Libgit2 Bindings for Common Lisp</title>
+<meta http-equiv="Content-Type" content="text/html">
+<meta name="description" content="Libgit2 Bindings for Common Lisp">
+<meta name="generator" content="makeinfo 4.8">
+<link title="Top" rel="top" href="#Top">
+<link href="http://www.gnu.org/software/texinfo/" rel="generator-home" title="Texinfo Homepage">
+<!--
+cl-git a Common Lisp interface to git repositories.
+Copyright (C) 2011, 2012 Russell Sim <russell.sim@gmail.com>.
+
+This program is free software: you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public License
+as published by the Free Software Foundation, either version 3 of
+the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this program.  If not, see
+`http://www.gnu.org/licenses/'.-->
+<meta http-equiv="Content-Style-Type" content="text/css">
+<style type="text/css"><!--
+  pre.display { font-family:inherit }
+  pre.format  { font-family:inherit }
+  pre.smalldisplay { font-family:inherit; font-size:smaller }
+  pre.smallformat  { font-family:inherit; font-size:smaller }
+  pre.smallexample { font-size:smaller }
+  pre.smalllisp    { font-size:smaller }
+  span.sc    { font-variant:small-caps }
+  span.roman { font-family:serif; font-weight:normal; } 
+  span.sansserif { font-family:sans-serif; font-weight:normal; } 
+.node { visibility:hidden; height: 0px; }
+  .menu { visibility:hidden; height: 0px; }
+  .appendix { background-color:#a4bbff; padding: 0.2em; }
+  .chapter { background-color:#a4bbff; padding: 0.2em; }
+  .section { background-color:#a4bbff; padding: 0.2em; }
+  .settitle { background-color:#a4bbff; }
+  .contents { border: 2px solid black;
+              margin: 1cm 1cm 1cm 1cm;
+              padding-left: 3mm; }
+  .lisp { padding: 0; margin: 0em; }
+  code { font-family: sans-serif; font-style: italic;}
+  body { padding: 2em 8em; font-family: sans-serif; }
+  h1 { padding: 1em; text-align: center; }
+  li { margin: 1em; }
+
+--></style>
+</head>
+<body>
+<h1 class="settitle">Libgit2 Bindings for Common Lisp</h1>
+<div class="node">
+<p><hr>
+<a name="Top"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Overview">Overview</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#dir">(dir)</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#dir">(dir)</a>
+
+</div>
+
+<h2 class="unnumbered">Introduction</h2>
+
+<div class="contents">
+<h2>Table of Contents</h2>
+<ul>
+<li><a name="toc_Top" href="#Top">Introduction</a>
+<li><a name="toc_Overview" href="#Overview">1 Overview</a>
+<ul>
+<li><a href="#Example">1.1 Example</a>
+</li></ul>
+<li><a name="toc_CLOS-Interface" href="#CLOS-Interface">2 CLOS Interface</a>
+<ul>
+<li><a href="#Function-Name-Mapping">2.1 Function Name Mapping</a>
+<li><a href="#Object-Hierarchy">2.2 Object Hierarchy</a>
+<li><a href="#Memory-Management">2.3 Memory Management</a>
+</li></ul>
+<li><a name="toc_Reference-By-Class" href="#Reference-By-Class">3 Reference By Class</a>
+<ul>
+<li><a href="#Object">3.1 Object</a>
+<ul>
+<li><a href="#Object">3.1.1 Generic Functions</a>
+<li><a href="#Object">3.1.2 Functions Specialized in Sub Classes</a>
+</li></ul>
+<li><a href="#Commit">3.2 Commit</a>
+<ul>
+<li><a href="#Commit">3.2.1 Inherited Functions</a>
+<li><a href="#Commit">3.2.2 Commit Specific Functions</a>
+</li></ul>
+<li><a href="#Tag">3.3 Tag</a>
+<li><a href="#Reference">3.4 Reference</a>
+<li><a href="#Tree">3.5 Tree</a>
+<li><a href="#Config">3.6 Config</a>
+<li><a href="#Repository">3.7 Repository</a>
+<li><a href="#Revisions">3.8 Revision</a>
+<li><a href="#Blob">3.9 Blob</a>
+<li><a href="#Index">3.10 Index</a>
+</li></ul>
+<li><a name="toc_Low-Level-Functions" href="#Low-Level-Functions">4 Low Level Functions</a>
+<li><a name="toc_Function-Index" href="#Function-Index">Appendix A Function Index</a>
+</li></ul>
+</div>
+
+<ul class="menu">
+<li><a accesskey="1" href="#Overview">Overview</a>
+<li><a accesskey="2" href="#CLOS-Interface">CLOS Interface</a>
+<li><a accesskey="3" href="#Reference-By-Class">Reference By Class</a>
+<li><a accesskey="4" href="#Low-Level-Functions">Low Level Functions</a>
+<li><a accesskey="5" href="#Function-Index">Function Index</a>
+</ul>
+
+<div class="node">
+<p><hr>
+<a name="Overview"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#CLOS-Interface">CLOS Interface</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Top">Top</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Top">Top</a>
+
+</div>
+
+<h2 class="chapter">1 Overview</h2>
+
+<p>This library wraps the C library libgit2.  As the name implies it deals with git
+and allows you to create/examine and alter git repositories programmatically.
+
+   <p>Some knowledge if git is required to make sense of all the concepts.  Also this
+being a wrapper around the libgit2 library, the documentation libgit2, which can be foud
+at <a href="http://libgit2.github.com/libgit2/#HEAD">http://libgit2.github.com/libgit2/#HEAD</a> is very helpfull.
+
+<ul class="menu">
+<li><a accesskey="1" href="#Example">Example</a>
+</ul>
+
+<div class="node">
+<p><hr>
+<a name="Example"></a>
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Overview">Overview</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Overview">Overview</a>
+
+</div>
+
+<h3 class="section">1.1 Example</h3>
+
+<div class="node">
+<p><hr>
+<a name="CLOS-Interface"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Reference-By-Class">Reference By Class</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Overview">Overview</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Top">Top</a>
+
+</div>
+
+<h2 class="chapter">2 CLOS Interface</h2>
+
+<p>The interface exposed by libgit2 is basically an object oriented
+interface, but expressed in C.  The CLOS interface of cl-git combines
+the myriad of functions back into an object oriented structure.
+
+<ul class="menu">
+<li><a accesskey="1" href="#Function-Name-Mapping">Function Name Mapping</a>
+<li><a accesskey="2" href="#Object-Hierarchy">Object Hierarchy</a>
+<li><a accesskey="3" href="#Memory-Management">Memory Management</a>
+</ul>
+
+<div class="node">
+<p><hr>
+<a name="Function-Name-Mapping"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Object-Hierarchy">Object Hierarchy</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#CLOS-Interface">CLOS Interface</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#CLOS-Interface">CLOS Interface</a>
+
+</div>
+
+<h3 class="section">2.1 Function Name Mapping</h3>
+
+<p>The mapping from libgit2 names to generic functions is roughly as follows,
+take the libgit2 name such as <code>git_commit_message</code>, replace the underscore with a hyphen
+and remove the specific type of object, in this case `<samp><span class="samp">commit</span></samp>'.  This yields
+in this case <code>git-message</code> and that is the generic function name.
+
+<div class="node">
+<p><hr>
+<a name="Object-Hierarchy"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Memory-Management">Memory Management</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Function-Name-Mapping">Function Name Mapping</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#CLOS-Interface">CLOS Interface</a>
+
+</div>
+
+<h3 class="section">2.2 Object Hierarchy</h3>
+
+<p>The object hierarchy for objects in the git database is very simple,
+there is one root class called <code>object</code> and all other objects are
+subclasses, one level deep, of this class.  The subclasses are:
+
+     <ul>
+<li>commit
+<li>tag
+<li>tree
+<li>blob (not implemented yet)
+</ul>
+
+   <p>There are also objects that are not stored in the git database, such as
+
+     <ul>
+<li>reference
+<li>index
+<li>repository
+<li>config
+</ul>
+
+   <p>These items are root classes and do not inherit from <code>object</code>.
+
+<div class="node">
+<p><hr>
+<a name="Memory-Management"></a>
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Object-Hierarchy">Object Hierarchy</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#CLOS-Interface">CLOS Interface</a>
+
+</div>
+
+<h3 class="section">2.3 Memory Management</h3>
+
+<p>TO BE WRITTEN
+
+<div class="node">
+<p><hr>
+<a name="Reference-By-Class"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Low-Level-Functions">Low Level Functions</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#CLOS-Interface">CLOS Interface</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Top">Top</a>
+
+</div>
+
+<h2 class="chapter">3 Reference By Class</h2>
+
+<ul class="menu">
+<li><a accesskey="1" href="#Object">Object</a>
+<li><a accesskey="2" href="#Commit">Commit</a>
+<li><a accesskey="3" href="#Tag">Tag</a>
+<li><a accesskey="4" href="#Reference">Reference</a>
+<li><a accesskey="5" href="#Tree">Tree</a>
+<li><a accesskey="6" href="#Config">Config</a>
+<li><a accesskey="7" href="#Repository">Repository</a>
+<li><a accesskey="8" href="#Revisions">Revisions</a>
+<li><a accesskey="9" href="#Blob">Blob</a>
+<li><a href="#Index">Index</a>
+</ul>
+
+<div class="node">
+<p><hr>
+<a name="Object"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Commit">Commit</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Reference-By-Class">Reference By Class</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Reference-By-Class">Reference By Class</a>
+
+</div>
+
+<h3 class="section">3.1 Object</h3>
+
+<h4 class="subsection">3.1.1 Generic Functions</h4>
+
+<p>The functions listed here are generic in the sense that each
+object supports them.
+
+   <p><a name="index-git_002did-1"></a><a name="Generic_002dFunction-git_002did"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-id</b><var> object<a name="index-git_002did-2"></a></var><br>
+<blockquote><p>Return the identifier of <code>object</code>. 
+The identifier is typically the SHA-1 checksum or hash code.
+
+        <p>Note that this is an integer, and not the string you typically see reported by git.
+
+        <p>To get the string representation use format like this:
+
+     <pre class="lisp">              (format nil "~40,'0X" (git-id object))
+     </pre>
+        <p>or if you want lowercase hexadecimal digits:
+
+     <pre class="lisp">              (format nil "~(~40,'0X~)" (git-id object))
+     </pre>
+        <p>If you want to be absolutely sure what libgit2 thinks the hash string is do the following:
+
+     <pre class="lisp">              (git-oid-tostr (git-id object))
+     </pre>
+        </blockquote></div>
+
+   <p><a name="index-git_002dlookup-3"></a><a name="Generic_002dFunction-git_002dlookup"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-lookup</b><var> id &amp;key type type<a name="index-git_002dlookup-4"></a></var><br>
+<blockquote><p>Returns a reference to the git odb (object) which is identified by the <code>oid</code>. 
+The type argument specifies which type is expected.  If the found
+object is not of the right type, an error will be signaled.  The type
+is one of <code>:any</code>, <code>:bad</code>, <code>:commit</code> <code>:tree</code> <code>:blob</code> <code>:tag</code> <code>:ofs-delta</code> <code>:refs-delta</code>. 
+<code>:any</code> and <code>:bad</code> are special cases.  <code>:any</code> means return the object found,
+do not do a typecheck and is a valid type, but should typically not
+occur.
+
+        <p>Note that the returned git object should be freed with <code>git-object-free</code>. 
+</p></blockquote></div>
+
+   <p><a name="index-git_002dtype-5"></a><a name="Generic_002dFunction-git_002dtype"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-type</b><var> object<a name="index-git_002dtype-6"></a></var><br>
+<blockquote><p>Returns the type of the git object. 
+</p></blockquote></div>
+
+<h4 class="subsection">3.1.2 Functions Specialized in Sub Classes</h4>
+
+<p>The functions listed here are not supported by object itself but by
+multiple subclasses.  They are listed here to avoid duplication
+of the documentation.  Each subclass that supports them has a reference
+to this documentation, or if needed a complete separate section on them.
+
+   <p><a name="index-git_002dtree-7"></a><a name="Generic_002dFunction-git_002dtree"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-tree</b><var> object<a name="index-git_002dtree-8"></a></var><br>
+<blockquote><p>Returns the tree as a git tree object, for object <code>object</code>. 
+</p></blockquote></div>
+
+   <p><a name="index-git_002dentries-9"></a><a name="Generic_002dFunction-git_002dentries"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-entries</b><var> object<a name="index-git_002dentries-10"></a></var><br>
+<blockquote><p><code>todo</code>
+</p></blockquote></div>
+
+   <p><a name="index-git_002dentry_002dby_002dindex-11"></a><a name="Generic_002dFunction-git_002dentry_002dby_002dindex"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-entry-by-index</b><var> object index<a name="index-git_002dentry_002dby_002dindex-12"></a></var><br>
+<blockquote><p><code>todo</code>
+</p></blockquote></div>
+
+   <p><a name="index-git_002dentry_002dcount-13"></a><a name="Generic_002dFunction-git_002dentry_002dcount"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-entry-count</b><var> object<a name="index-git_002dentry_002dcount-14"></a></var><br>
+<blockquote><p><code>todo</code>
+</p></blockquote></div>
+
+   <p><a name="index-git_002dmessage-15"></a><a name="Generic_002dFunction-git_002dmessage"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-message</b><var> object<a name="index-git_002dmessage-16"></a></var><br>
+<blockquote><p>Return the message associated with <code>object</code>. 
+</p></blockquote></div>
+
+   <p><a name="index-git_002dname-17"></a><a name="Generic_002dFunction-git_002dname"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-name</b><var> object<a name="index-git_002dname-18"></a></var><br>
+<blockquote><p><code>todo</code>
+</p></blockquote></div>
+
+   <p><a name="index-git_002dauthor-19"></a><a name="Generic_002dFunction-git_002dauthor"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-author</b><var> object<a name="index-git_002dauthor-20"></a></var><br>
+<blockquote><p>Returns an alist containing the author's signature of <code>object</code>. 
+A signature is a list with the keys :name :email and :time. 
+</p></blockquote></div>
+
+   <p><a name="index-git_002dcommitter-21"></a><a name="Generic_002dFunction-git_002dcommitter"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-committer</b><var> object<a name="index-git_002dcommitter-22"></a></var><br>
+<blockquote><p>Returns an alist containing the commiter's signature of <code>object</code>. 
+A signature is a list with the keys :name :email and :time. 
+</p></blockquote></div>
+
+<div class="node">
+<p><hr>
+<a name="Commit"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Tag">Tag</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Object">Object</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Reference-By-Class">Reference By Class</a>
+
+</div>
+
+<h3 class="section">3.2 Commit</h3>
+
+<h4 class="subsection">3.2.1 Inherited Functions</h4>
+
+<p><a name="index-git_002did-23"></a><a name="Generic_002dFunction-git_002did"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-id</b><var> object<a name="index-git_002did-24"></a></var><br>
+<blockquote><p>Return the identifier of <code>object</code>. 
+The identifier is typically the SHA-1 checksum or hash code.
+
+        <p>Note that this is an integer, and not the string you typically see reported by git.
+
+        <p>To get the string representation use format like this:
+
+     <pre class="lisp">              (format nil "~40,'0X" (git-id object))
+     </pre>
+        <p>or if you want lowercase hexadecimal digits:
+
+     <pre class="lisp">              (format nil "~(~40,'0X~)" (git-id object))
+     </pre>
+        <p>If you want to be absolutely sure what libgit2 thinks the hash string is do the following:
+
+     <pre class="lisp">              (git-oid-tostr (git-id object))
+     </pre>
+        </blockquote></div>
+
+   <p><a name="Method-git_002dmessage-_0028_0028commit-commit_0029_0029"></a>
+
+<div class="defun">
+&mdash; Method: <b>git-message</b> (<var>commit commit</var>)<var><a name="index-git_002dmessage-25"></a></var><br>
+<blockquote><p>Return a string containing the commit message. 
+</p></blockquote></div>
+
+   <p><a name="Method-git_002dauthor-_0028_0028commit-commit_0029_0029"></a>
+
+<div class="defun">
+&mdash; Method: <b>git-author</b> (<var>commit commit</var>)<var><a name="index-git_002dauthor-26"></a></var><br>
+<blockquote><p>Given a commit return the commit author's signature. 
+</p></blockquote></div>
+
+   <p><a name="index-git_002dcommitter-27"></a><a name="Generic_002dFunction-git_002dcommitter"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-committer</b><var> object<a name="index-git_002dcommitter-28"></a></var><br>
+<blockquote><p>Returns an alist containing the commiter's signature of <code>object</code>. 
+A signature is a list with the keys :name :email and :time. 
+</p></blockquote></div>
+
+   <p><a name="Method-git_002dtree-_0028_0028commit-commit_0029_0029"></a>
+
+<div class="defun">
+&mdash; Method: <b>git-tree</b> (<var>commit commit</var>)<var><a name="index-git_002dtree-29"></a></var><br>
+<blockquote><p>Returns the tree object of the commit. 
+</p></blockquote></div>
+
+<h4 class="subsection">3.2.2 Commit Specific Functions</h4>
+
+<p><a name="index-bind_002dgit_002dcommits-30"></a><a name="Macro-bind_002dgit_002dcommits"></a>
+
+<div class="defun">
+&mdash; Macro: <b>bind-git-commits</b><var> bindings &amp;body body<a name="index-bind_002dgit_002dcommits-31"></a></var><br>
+<blockquote><p>Lookup commits specified in the bindings.  The bindings syntax is
+similar to the <code>let</code> syntax except instead of needing to specify an
+initial form key arguments are used.  Atleast one key arguments <code>sha</code> or
+<code>head</code> must be specified.  <code>sha</code> is a hash of the commit.  <code>head</code> is a full
+ref path. 
+</p></blockquote></div>
+
+   <p><a name="index-make_002dcommit-32"></a><a name="Function-make_002dcommit"></a>
+
+<div class="defun">
+&mdash; Function: <b>make-commit</b><var> oid message &amp;key update-ref author committer parents<a name="index-make_002dcommit-33"></a></var><br>
+<blockquote><p>Create a new commit from the tree with the <code>oid</code> specified and
+<code>message</code>.  Optional <code>update-ref</code> is the name of the reference that will
+be updated to point to this commit.  The default value "HEAD" will
+updote the head of the current branch.  If it's value is <code>null</code> then no
+reference will be updated.  <code>author</code> is an optional instance of a
+<code>git-signature</code> that details the commit author.  <code>committer</code> is an
+optional instance of a <code>git-signature</code> the details the commit committer. 
+<code>parents</code> is an optional list of parent commits sha1 hashes. 
+</p></blockquote></div>
+
+   <p><a name="Method-git_002dparentcount-_0028_0028commit-commit_0029_0029"></a>
+
+<div class="defun">
+&mdash; Method: <b>git-parentcount</b> (<var>commit commit</var>)<var><a name="index-git_002dparentcount-34"></a></var><br>
+<blockquote><p>Returns the number of parent commits of the argument <code>commit</code>. 
+</p></blockquote></div>
+
+   <p><a name="Method-git_002dparent_002doid-_0028_0028commit-commit_0029-index_0029"></a>
+
+<div class="defun">
+&mdash; Method: <b>git-parent-oid</b> (<var>commit commit</var>)<var> index<a name="index-git_002dparent_002doid-35"></a></var><br>
+<blockquote><p>Returns the oid of the parent with index <code>index</code> in the list of
+parents of the commit <code>commit</code>. 
+</p></blockquote></div>
+
+   <p><a name="index-git_002dparent_002doids-36"></a><a name="Generic_002dFunction-git_002dparent_002doids"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-parent-oids</b><var> object<a name="index-git_002dparent_002doids-37"></a></var><br>
+<blockquote><p>Returns a list of oids identifying the parent commits of <code>object</code>
+</p></blockquote></div>
+
+<div class="node">
+<p><hr>
+<a name="Tag"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Reference">Reference</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Commit">Commit</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Reference-By-Class">Reference By Class</a>
+
+</div>
+
+<h3 class="section">3.3 Tag</h3>
+
+<p><a name="index-git_002dtagger-38"></a><a name="Generic_002dFunction-git_002dtagger"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-tagger</b><var> object<a name="index-git_002dtagger-39"></a></var><br>
+<blockquote><p><code>todo</code>
+</p></blockquote></div>
+
+   <p><a name="index-git_002dtarget-40"></a><a name="Generic_002dFunction-git_002dtarget"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-target</b><var> object<a name="index-git_002dtarget-41"></a></var><br>
+<blockquote><p>Need to rewrite to return an object!<code>!</code>!<code>!</code>
+</p></blockquote></div>
+
+   <p><a name="index-git_002dtype-42"></a><a name="Generic_002dFunction-git_002dtype"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>git-type</b><var> object<a name="index-git_002dtype-43"></a></var><br>
+<blockquote><p>Returns the type of the git object. 
+</p></blockquote></div>
+
+<div class="node">
+<p><hr>
+<a name="Reference"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Tree">Tree</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Tag">Tag</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Reference-By-Class">Reference By Class</a>
+
+</div>
+
+<h3 class="section">3.4 Reference</h3>
+
+<p><a name="index-git_002dreference_002dcreate-44"></a><a name="Function-git_002dreference_002dcreate"></a>
+
+<div class="defun">
+&mdash; Function: <b>git-reference-create</b><var> name &amp;key sha head force<a name="index-git_002dreference_002dcreate-45"></a></var><br>
+<blockquote><p>Create new reference in the current repository with <code>name</code> linking to
+<code>sha</code> or <code>head</code>.  If <code>force</code> is true then override if it already exists. 
+</p></blockquote></div>
+
+   <p><a name="index-git_002dreference_002dlistall-46"></a><a name="Function-git_002dreference_002dlistall"></a>
+
+<div class="defun">
+&mdash; Function: <b>git-reference-listall</b><var> &amp;rest flags<a name="index-git_002dreference_002dlistall-47"></a></var><br>
+<blockquote><p>List all the refs, filter by <code>flags</code>.  The flag options
+are <code>:invalid</code>, <code>:oid</code>, <code>:symbolic</code>, <code>:packed</code> or <code>:has-peel</code>
+</p></blockquote></div>
+
+   <p><a name="index-git_002dreference_002dlookup-48"></a><a name="Function-git_002dreference_002dlookup"></a>
+
+<div class="defun">
+&mdash; Function: <b>git-reference-lookup</b><var> name<a name="index-git_002dreference_002dlookup-49"></a></var><br>
+<blockquote><p>Find a reference by its full name e.g.<code>:</code> ref/heads/master
+</p></blockquote></div>
+
+   <p><a name="index-git_002dreference_002doid-50"></a><a name="Function-git_002dreference_002doid"></a>
+
+<div class="defun">
+&mdash; Function: <b>git-reference-oid</b><var> reference<a name="index-git_002dreference_002doid-51"></a></var><br>
+<blockquote><p>Return the oid from within the reference. 
+</p></blockquote></div>
+
+   <p><a name="index-git_002dreference_002dresolve-52"></a><a name="Function-git_002dreference_002dresolve"></a>
+
+<div class="defun">
+&mdash; Function: <b>git-reference-resolve</b><var> reference<a name="index-git_002dreference_002dresolve-53"></a></var><br>
+<blockquote><p>If the reference is symbolic, follow the it until it finds a non
+symbolic reference.  The result should be freed independently from the
+argument. 
+</p></blockquote></div>
+
+<div class="node">
+<p><hr>
+<a name="Tree"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Config">Config</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Reference">Reference</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Reference-By-Class">Reference By Class</a>
+
+</div>
+
+<h3 class="section">3.5 Tree</h3>
+
+<div class="node">
+<p><hr>
+<a name="Config"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Repository">Repository</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Tree">Tree</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Reference-By-Class">Reference By Class</a>
+
+</div>
+
+<h3 class="section">3.6 Config</h3>
+
+<p><a name="index-git_002dconfig_002dfree-54"></a><a name="Function-git_002dconfig_002dfree"></a>
+
+<div class="defun">
+&mdash; Function: <b>git-config-free</b><var> config<a name="index-git_002dconfig_002dfree-55"></a></var><br>
+<blockquote><p>Free the git configuration object that is acquired with <code>git-repository-config</code>. 
+</p></blockquote></div>
+
+   <p><a name="index-git_002dconfig_002dvalues-56"></a><a name="Function-git_002dconfig_002dvalues"></a>
+
+<div class="defun">
+&mdash; Function: <b>git-config-values</b><var> config<a name="index-git_002dconfig_002dvalues-57"></a></var><br>
+<blockquote><p>Returns the key value pairs in the config as an association list. 
+</p></blockquote></div>
+
+<div class="node">
+<p><hr>
+<a name="Repository"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Revisions">Revisions</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Config">Config</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Reference-By-Class">Reference By Class</a>
+
+</div>
+
+<h3 class="section">3.7 Repository</h3>
+
+<p><a name="index-with_002drepository_002dindex-58"></a><a name="Macro-with_002drepository_002dindex"></a>
+
+<div class="defun">
+&mdash; Macro: <b>with-repository-index</b><var> &amp;body body<a name="index-with_002drepository_002dindex-59"></a></var><br>
+<blockquote><p>Load a repository index uses the current <code>*git-repository*</code> as the
+current repository and sets <code>*git-repository-index*</code> as the newly opened
+index. 
+</p></blockquote></div>
+
+   <p><a name="index-with_002drepository-60"></a><a name="Macro-with_002drepository"></a>
+
+<div class="defun">
+&mdash; Macro: <b>with-repository</b> (<var>path</var>)<var> &amp;body body<a name="index-with_002drepository-61"></a></var><br>
+<blockquote><p>Evaluates the body with <code>*git-repository*</code> bound to a newly opened
+repositony at path. 
+</p></blockquote></div>
+
+   <p><a name="index-ensure_002drepository_002dexist-62"></a><a name="Function-ensure_002drepository_002dexist"></a>
+
+<div class="defun">
+&mdash; Function: <b>ensure-repository-exist</b><var> path &amp;optional bare<a name="index-ensure_002drepository_002dexist-63"></a></var><br>
+<blockquote><p>Open a repository at location, if the repository doesn't exist
+create it.  <code>bare</code> is an optional argument if specified and true, the newly
+created repository will be bare. 
+</p></blockquote></div>
+
+   <p><a name="index-repository_002dconfig-64"></a><a name="Function-repository_002dconfig"></a>
+
+<div class="defun">
+&mdash; Function: <b>repository-config</b><var><a name="index-repository_002dconfig-65"></a></var><br>
+<blockquote><p>Return the config object of the current open repository. 
+</p></blockquote></div>
+
+<div class="node">
+<p><hr>
+<a name="Revisions"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Blob">Blob</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Repository">Repository</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Reference-By-Class">Reference By Class</a>
+
+</div>
+
+<h3 class="section">3.8 Revision</h3>
+
+<p><a name="index-revision_002dwalk-66"></a><a name="Function-revision_002dwalk"></a>
+
+<div class="defun">
+&mdash; Function: <b>revision-walk</b><var> name-or-names &amp;optional flags<a name="index-revision_002dwalk-67"></a></var><br>
+<blockquote><p>Create a revision walker starts iteration from the commits listed
+in <code>name-or-names</code>. A head or sha that matches can be filterd using the
+flags <code>:sha</code>, <code>:head</code> or <code>:both</code>.
+
+        <p>Once created iteration over commits can be done with the method
+<code>walker-next</code>. 
+</p></blockquote></div>
+
+   <p><a name="index-with_002dgit_002drevisions-68"></a><a name="Macro-with_002dgit_002drevisions"></a>
+
+<div class="defun">
+&mdash; Macro: <b>with-git-revisions</b> (<var>commit &amp;rest rest &amp;key sha head</var>)<var> &amp;body body<a name="index-with_002dgit_002drevisions-69"></a></var><br>
+<blockquote><p>Iterate aver all the revisions, the symbol specified by <code>commit</code> will
+be bound to each commit during each iteration.  This uses a return
+special call to stop iteration. 
+</p></blockquote></div>
+
+   <p><a name="index-walker_002dnext-70"></a><a name="Generic_002dFunction-walker_002dnext"></a>
+
+<div class="defun">
+&mdash; Generic Function: <b>walker-next</b><var> walker<a name="index-walker_002dnext-71"></a></var><br>
+<blockquote><p>Returns the next object for the walker. 
+If no objects are available anymore return nil. 
+</p></blockquote></div>
+
+<div class="node">
+<p><hr>
+<a name="Blob"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Index">Index</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Revisions">Revisions</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Reference-By-Class">Reference By Class</a>
+
+</div>
+
+<h3 class="section">3.9 Blob</h3>
+
+<p><a name="index-git_002dblob_002dlookup-72"></a><a name="Function-git_002dblob_002dlookup"></a>
+
+<div class="defun">
+&mdash; Function: <b>git-blob-lookup</b><var> oid<a name="index-git_002dblob_002dlookup-73"></a></var><br>
+<blockquote><p>Returns a blob identified by the oid. 
+</p></blockquote></div>
+
+   <p><a name="index-git_002dblob_002draw_002dsize-74"></a><a name="Function-git_002dblob_002draw_002dsize"></a>
+
+<div class="defun">
+&mdash; Function: <b>git-blob-raw-size</b><var> blob<a name="index-git_002dblob_002draw_002dsize-75"></a></var><br>
+<blockquote><p>The number of content bytes in the blob. 
+</p></blockquote></div>
+
+<div class="node">
+<p><hr>
+<a name="Index"></a>
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Blob">Blob</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Reference-By-Class">Reference By Class</a>
+
+</div>
+
+<h3 class="section">3.10 Index</h3>
+
+<p><a name="index-git_002dindex_002dadd-76"></a><a name="Function-git_002dindex_002dadd"></a>
+
+<div class="defun">
+&mdash; Function: <b>git-index-add</b><var> path<a name="index-git_002dindex_002dadd-77"></a></var><br>
+<blockquote><p>Add a file at <code>path</code> to the repository, the <code>path</code> should be relative
+to the repository. 
+</p></blockquote></div>
+
+   <p><a name="index-git_002dindex_002dwrite-78"></a><a name="Function-git_002dindex_002dwrite"></a>
+
+<div class="defun">
+&mdash; Function: <b>git-index-write</b><var><a name="index-git_002dindex_002dwrite-79"></a></var><br>
+<blockquote><p>Write the current index stored in <code>*git-repository-index*</code> to disk. 
+</p></blockquote></div>
+
+   <p><a name="index-git_002doid_002dfrom_002dindex-80"></a><a name="Function-git_002doid_002dfrom_002dindex"></a>
+
+<div class="defun">
+&mdash; Function: <b>git-oid-from-index</b><var><a name="index-git_002doid_002dfrom_002dindex-81"></a></var><br>
+<blockquote><p>Write the current index to the disk and return an oid to it. 
+</p></blockquote></div>
+
+<div class="node">
+<p><hr>
+<a name="Low-Level-Functions"></a>
+Next:&nbsp;<a rel="next" accesskey="n" href="#Function-Index">Function Index</a>,
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Reference-By-Class">Reference By Class</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Top">Top</a>
+
+</div>
+
+<h2 class="chapter">4 Low Level Functions</h2>
+
+<p>These functions mostly call directly the underlying C function and
+the code in the CLOS interface is build on top of this. 
+They should normally not be called and this section
+is only here to document functions that might still be usefull (or are accidentely exported).
+
+   <p><a name="index-git_002dobject_002dfree-82"></a><a name="Function-git_002dobject_002dfree"></a>
+
+<div class="defun">
+&mdash; Function: <b>git-object-free</b><var> object<a name="index-git_002dobject_002dfree-83"></a></var><br>
+<blockquote><p>Free the git object. 
+</p></blockquote></div>
+
+<div class="node">
+<p><hr>
+<a name="Function-Index"></a>
+Previous:&nbsp;<a rel="previous" accesskey="p" href="#Low-Level-Functions">Low Level Functions</a>,
+Up:&nbsp;<a rel="up" accesskey="u" href="#Top">Top</a>
+
+</div>
+
+<h2 class="appendix">Appendix A Function Index</h2>
+
+<ul class="index-fn" compact>
+<li><a href="#index-bind_002dgit_002dcommits-31"><code>bind-git-commits</code></a>: <a href="#Commit">Commit</a></li>
+<li><a href="#index-ensure_002drepository_002dexist-63"><code>ensure-repository-exist</code></a>: <a href="#Repository">Repository</a></li>
+<li><a href="#index-git_002dauthor-20"><code>git-author</code></a>: <a href="#Object">Object</a></li>
+<li><a href="#index-git_002dauthor-26"><code>git-author</code></a>: <a href="#Commit">Commit</a></li>
+<li><a href="#index-git_002dauthor-19"><code>git-author</code></a>: <a href="#Object">Object</a></li>
+<li><a href="#index-git_002dblob_002dlookup-73"><code>git-blob-lookup</code></a>: <a href="#Blob">Blob</a></li>
+<li><a href="#index-git_002dblob_002draw_002dsize-74"><code>git-blob-raw-size</code></a>: <a href="#Blob">Blob</a></li>
+<li><a href="#index-git_002dcommitter-22"><code>git-committer</code></a>: <a href="#Object">Object</a></li>
+<li><a href="#index-git_002dcommitter-28"><code>git-committer</code></a>: <a href="#Commit">Commit</a></li>
+<li><a href="#index-git_002dcommitter-21"><code>git-committer</code></a>: <a href="#Object">Object</a></li>
+<li><a href="#index-git_002dconfig_002dfree-55"><code>git-config-free</code></a>: <a href="#Config">Config</a></li>
+<li><a href="#index-git_002dconfig_002dvalues-56"><code>git-config-values</code></a>: <a href="#Config">Config</a></li>
+<li><a href="#index-git_002dentries-10"><code>git-entries</code></a>: <a href="#Object">Object</a></li>
+<li><a href="#index-git_002dentry_002dby_002dindex-12"><code>git-entry-by-index</code></a>: <a href="#Object">Object</a></li>
+<li><a href="#index-git_002dentry_002dcount-14"><code>git-entry-count</code></a>: <a href="#Object">Object</a></li>
+<li><a href="#index-git_002did-1"><code>git-id</code></a>: <a href="#Object">Object</a></li>
+<li><a href="#index-git_002did-23"><code>git-id</code></a>: <a href="#Commit">Commit</a></li>
+<li><a href="#index-git_002dindex_002dadd-77"><code>git-index-add</code></a>: <a href="#Index">Index</a></li>
+<li><a href="#index-git_002dindex_002dwrite-79"><code>git-index-write</code></a>: <a href="#Index">Index</a></li>
+<li><a href="#index-git_002dlookup-3"><code>git-lookup</code></a>: <a href="#Object">Object</a></li>
+<li><a href="#index-git_002dmessage-25"><code>git-message</code></a>: <a href="#Commit">Commit</a></li>
+<li><a href="#index-git_002dmessage-16"><code>git-message</code></a>: <a href="#Object">Object</a></li>
+<li><a href="#index-git_002dname-18"><code>git-name</code></a>: <a href="#Object">Object</a></li>
+<li><a href="#index-git_002dobject_002dfree-82"><code>git-object-free</code></a>: <a href="#Low-Level-Functions">Low Level Functions</a></li>
+<li><a href="#index-git_002doid_002dfrom_002dindex-81"><code>git-oid-from-index</code></a>: <a href="#Index">Index</a></li>
+<li><a href="#index-git_002dparent_002doid-35"><code>git-parent-oid</code></a>: <a href="#Commit">Commit</a></li>
+<li><a href="#index-git_002dparent_002doids-36"><code>git-parent-oids</code></a>: <a href="#Commit">Commit</a></li>
+<li><a href="#index-git_002dparentcount-34"><code>git-parentcount</code></a>: <a href="#Commit">Commit</a></li>
+<li><a href="#index-git_002dreference_002dcreate-44"><code>git-reference-create</code></a>: <a href="#Reference">Reference</a></li>
+<li><a href="#index-git_002dreference_002dlistall-46"><code>git-reference-listall</code></a>: <a href="#Reference">Reference</a></li>
+<li><a href="#index-git_002dreference_002dlookup-48"><code>git-reference-lookup</code></a>: <a href="#Reference">Reference</a></li>
+<li><a href="#index-git_002dreference_002doid-51"><code>git-reference-oid</code></a>: <a href="#Reference">Reference</a></li>
+<li><a href="#index-git_002dreference_002dresolve-52"><code>git-reference-resolve</code></a>: <a href="#Reference">Reference</a></li>
+<li><a href="#index-git_002dtagger-38"><code>git-tagger</code></a>: <a href="#Tag">Tag</a></li>
+<li><a href="#index-git_002dtarget-41"><code>git-target</code></a>: <a href="#Tag">Tag</a></li>
+<li><a href="#index-git_002dtree-7"><code>git-tree</code></a>: <a href="#Object">Object</a></li>
+<li><a href="#index-git_002dtree-29"><code>git-tree</code></a>: <a href="#Commit">Commit</a></li>
+<li><a href="#index-git_002dtype-43"><code>git-type</code></a>: <a href="#Tag">Tag</a></li>
+<li><a href="#index-git_002dtype-6"><code>git-type</code></a>: <a href="#Object">Object</a></li>
+<li><a href="#index-make_002dcommit-32"><code>make-commit</code></a>: <a href="#Commit">Commit</a></li>
+<li><a href="#index-repository_002dconfig-65"><code>repository-config</code></a>: <a href="#Repository">Repository</a></li>
+<li><a href="#index-revision_002dwalk-66"><code>revision-walk</code></a>: <a href="#Revisions">Revisions</a></li>
+<li><a href="#index-walker_002dnext-70"><code>walker-next</code></a>: <a href="#Revisions">Revisions</a></li>
+<li><a href="#index-with_002dgit_002drevisions-69"><code>with-git-revisions</code></a>: <a href="#Revisions">Revisions</a></li>
+<li><a href="#index-with_002drepository-61"><code>with-repository</code></a>: <a href="#Repository">Repository</a></li>
+<li><a href="#index-with_002drepository_002dindex-59"><code>with-repository-index</code></a>: <a href="#Repository">Repository</a></li>
+   </ul></body></html>
+
