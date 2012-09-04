@@ -83,6 +83,7 @@ at <a href="http://libgit2.github.com/libgit2/#HEAD">http://libgit2.github.com/l
 <li><a href="#Example">3.2 Inspecting a Single Commit</a>
 <ul>
 <li><a href="#Example">3.2.1 The Content of A Commit</a>
+<li><a href="#Example">3.2.2 Sub Directories</a>
 </li></ul>
 </li></ul>
 <li><a name="toc_CLOS-Interface" href="#CLOS-Interface">4 CLOS Interface</a>
@@ -90,6 +91,7 @@ at <a href="http://libgit2.github.com/libgit2/#HEAD">http://libgit2.github.com/l
 <li><a href="#Function-Name-Mapping">4.1 Function Name Mapping</a>
 <li><a href="#Object-Hierarchy">4.2 Object Hierarchy</a>
 <li><a href="#Memory-Management">4.3 Memory Management</a>
+<li><a href="#Memory-Management">4.4 Dependend Objects</a>
 </li></ul>
 <li><a name="toc_Reference-By-Class" href="#Reference-By-Class">5 Reference By Class</a>
 <ul>
@@ -267,9 +269,13 @@ it in base 16.
      ...)
 </pre>
    <p>So this gives you a list of files and directories in the commit.  Note
-that this gives only the top level entries, you need to traverse
-sub directories yourself.  In the example above <code>src</code> is a directory, which
-you can tell by interpreting the <code>:ATTR</code> value.
+that this gives only the top level entries, you need to traverse sub
+directories yourself.  In the example above <code>src</code> is a directory,
+which you can tell by interpreting the <code>:ATTR</code> value.  The meaning
+of the attribute flag is the same as in C and the flags are defined in
+<samp><span class="file">/usr/include/cpio.h</span></samp> ad <samp><span class="file">/usr/include/sys/stat.h</span></samp>.  For us
+the important thing to know is that 16384 (= <code>#8R40000</code>) indicates
+it is a directory.
 
    <p>Before we dive into this, we can get the content of the .gitignore file
 by extracting the OID, <code>1166326251727089714911644542196064058758301591936</code>
@@ -299,7 +305,30 @@ to work for ASCII).
      /doc/eggs/
      ......"
 </pre>
-   <div class="node">
+   <p>For proper decoding you should use your favorite method, e.g. use babel.
+
+<h4 class="subsection">3.2.2 Sub Directories</h4>
+
+<p>As mentioned before, you can see from the attribute directory if an
+entry in the tree is a sub directory.  The way to access a sub directory
+is by looking up the OID from the entry.  For this example we take the
+OID from the <samp><span class="file">src</span></samp> entry in the section above.
+
+<pre class="lisp">     &gt; (cl-git:git-lookup  1088911882924495776433938337720561272818465626581
+                           :repository *repo*)
+     #&lt;CL-GIT::TREE {10078100B3}&gt;
+</pre>
+   <p>Now notice that we knew beforehand that this was a directory because the
+<code>:ATTR</code> was <code>#8R40000</code>, but we can also tell it was a sub directory
+because the return value for looking up the entry is a a tree object.
+
+   <p>This tree object has entries, containing the files and sub directories
+of the <samp><span class="file">src</span></samp> directory of the git project.
+
+   <p>And we can repeat the same inspection, lookup etc as in the previous
+section.
+
+<div class="node">
 <p><hr>
 <a name="CLOS-Interface"></a>
 Next:&nbsp;<a rel="next" accesskey="n" href="#Reference-By-Class">Reference By Class</a>,
@@ -379,9 +408,61 @@ Up:&nbsp;<a rel="up" accesskey="u" href="#CLOS-Interface">CLOS Interface</a>
 
 <h3 class="section">4.3 Memory Management</h3>
 
-<p>TO BE WRITTEN
+<p>NOTE STILL UNDER IMPLEMENTATION
 
-<div class="node">
+   <p>Because C has manual memory management and Lisp automatic memory
+management there is the question on how these two systems integrate.
+
+   <p>First most libgit2 objects need to be freeed.  There are different free calls in libgit2, but
+in CL-git they are all replaced by <code>git-free</code>.
+
+   <p>Second of all, this call is made optional. The package
+`<samp><span class="samp">trivial-garbage</span></samp>' takes care of freeing the object when the garbage
+collector collects the Lisp git object wrappers.
+
+   <p>So normally you do not have to call the free explicitly.  However there
+are a few reasons you might want to do it anyway:
+
+     <ul>
+<li>Having a repository and commit objects open has the
+      side effect that file descriptors to the underlying git files stay open. 
+      When you iterate over may commits manually (not using the convience macros)
+      can trigger the Lisp process to run out of available file handles. 
+<li>Some libgit2 calls can potentially allocate lots of memory. 
+      Because the Lisp garbage collector does not see the memory
+      allocated by the libgit2 library, it helps to call the
+      <code>git-free</code> call to avoid usage build up. 
+</ul>
+
+<h3 class="section">4.4 Dependend Objects</h3>
+
+<p>Some objects, such as commits, are only valid as long as another object
+is valid, like a repository.  This means that as soon as a repository is
+<code>git-free</code>'ed the commit becomes invalid.  Also conversely, as long
+as we keep a reference to a commit and we expect that one to be valid,
+the repository can not be collected.  We call the commit the depend object and
+the repository the facilitating object.
+
+   <p>These dependencies are handled in CL-git in the following way:
+
+     <ul>
+<li>When a facilitating object is explicitly freed, or when a convenience macro
+such as <code>with-repository</code> frees the object because the execution path leaves scope,
+all dependend objects on that facilitating object are freed. 
+<li>Any depenend object holds a reference to its facilitator as long as it is not freed. 
+</ul>
+
+   <p>The consequences are that the following is not correct
+<pre class="lisp">     (with-git-repository (..)
+        (git-lookup ...))
+</pre>
+   <p>Because the returned object from the lookup call is not valid anymore
+because the repository is closed.
+
+   <p>However the following, although uncertain when the repository is closed, is correct
+<pre class="lisp">     (git-lookup ... :repository (git-repository-open ...))
+</pre>
+   <div class="node">
 <p><hr>
 <a name="Reference-By-Class"></a>
 Next:&nbsp;<a rel="next" accesskey="n" href="#Functions">Functions</a>,
