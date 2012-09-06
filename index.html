@@ -80,10 +80,11 @@ at <a href="http://libgit2.github.com/libgit2/#HEAD">http://libgit2.github.com/l
 <li><a name="toc_Example" href="#Example">3 Example Using CL-GIT</a>
 <ul>
 <li><a href="#Example">3.1 Listing References</a>
-<li><a href="#Example">3.2 Inspecting a Single Commit</a>
+<li><a href="#Example">3.2 Finding Commits</a>
+<li><a href="#Example">3.3 Inspecting a Single Commit</a>
 <ul>
-<li><a href="#Example">3.2.1 The Content of A Commit</a>
-<li><a href="#Example">3.2.2 Sub Directories</a>
+<li><a href="#Example">3.3.1 The Content of A Commit</a>
+<li><a href="#Example">3.3.2 Sub Directories</a>
 </li></ul>
 </li></ul>
 <li><a name="toc_CLOS-Interface" href="#CLOS-Interface">4 CLOS Interface</a>
@@ -214,9 +215,12 @@ the current (default) repository, and executes a body of code.   Like this:
      ("refs/heads/convert-to-classes" "refs/heads/gh-pages"
        ... )
 </pre>
-   <h3 class="section">3.2 Inspecting a Single Commit</h3>
+   <h3 class="section">3.2 Finding Commits</h3>
 
-<p>Now suppose we know the hash of a commit we can get to this commit as follows:
+<p>There are a few ways to find commits in the repository, the easiest is
+to find a commit when we know the SHA-1 has.  In that case
+the process is as follows:
+
 <pre class="lisp">     &gt; (setf *repo* (cl-git:git-repository-open
                        "/Users/woudshoo/Development/Source/Lisp/wo-git-gui/"))
      
@@ -226,7 +230,48 @@ the current (default) repository, and executes a body of code.   Like this:
                          :repository *repo*))
      #&lt;CL-GIT::COMMIT {10084FA0B3}&gt;
 </pre>
-   <p>Now we can inspect this commit to get the commit message and the author:
+   <p>However if we do not know the SHA-1 but we do know a reference, such as
+a branch name or tag.  We can get to the commit in a slightly more cumbersome way. 
+(A list of references is easy to get, see the previous section.)
+
+<pre class="lisp">     &gt; (cl-git:git-reference-lookup "refs/heads/master" :repository *repo*)
+     #&lt;CL-GIT::REFERENCE {1007A7CFD3}&gt;
+</pre>
+   <p>However to get from a reference to a commit is a bit of work.  First of
+all there are two basic kind of references.  Symbolic references and OID
+references.  Symbolic references hold a string naming another reference. 
+OID references hold an OID (not an object!).  So to correctly get to an
+object (not necessarily a commit) in the git repository you have to
+first follow the chain of symbolic references until you get to a OID
+reference.  Secondly, take the OID from the reference and thirdly look
+up the reference.
+
+   <p>The whole process is like this:
+<pre class="lisp">     &gt; (cl-git:git-resolve *)
+     #&lt;CL-GIT::REFERENCE {10087F8963}&gt;
+     &gt; (cl-git:git-reference-oid *)
+     207587661134746736018471038537375579765499147706
+     &gt; (cl-git:git-lookup * :repository *repo*)
+     #&lt;CL-GIT::COMMIT {1008BDDA13}&gt;
+</pre>
+   <p>In this case we ended up with a commit, however a reference can refer to
+any object in the git database, so tags, blobs and trees are also
+possible.
+
+   <p>Now in normal use you do not see references to blobs or trees very
+frequently, but references to tags are more common.
+
+   <p>So in normal code you have to check for that and act accordingly.
+
+   <p>NOTE: Need to write convenience functions so it follows the chain to
+commits etc.
+
+<h3 class="section">3.3 Inspecting a Single Commit</h3>
+
+<p>If we have found a commit and assinged it <code>*commit*</code> we can
+inspect this object to find out various bits of information.
+
+   <p>First we get the commit message and author as follows:
 
 <pre class="lisp">     &gt; (cl-git:git-message *commit*)
      "Started to write some documentation
@@ -252,7 +297,7 @@ as we did above.  This works because if a SHA-1 hash is expected and a
 string is supplied, CL-git converts the string to an integer by reading
 it in base 16.
 
-<h4 class="subsection">3.2.1 The Content of A Commit</h4>
+<h4 class="subsection">3.3.1 The Content of A Commit</h4>
 
 <p>To see what is in the commit we can get the tree out of the commit with
 
@@ -307,7 +352,7 @@ to work for ASCII).
 </pre>
    <p>For proper decoding you should use your favorite method, e.g. use babel.
 
-<h4 class="subsection">3.2.2 Sub Directories</h4>
+<h4 class="subsection">3.3.2 Sub Directories</h4>
 
 <p>As mentioned before, you can see from the attribute directory if an
 entry in the tree is a sub directory.  The way to access a sub directory
