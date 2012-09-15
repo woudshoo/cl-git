@@ -9,6 +9,7 @@
 <!--
 cl-git a Common Lisp interface to git repositories.
 Copyright (C) 2011, 2012 Russell Sim <russell.sim@gmail.com>.
+and Copyright (C) 2012 Willem Rein Oudshoorn <woudshoo@xs4all.nl>.
 
 This program is free software: you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public License
@@ -191,12 +192,12 @@ Up:&nbsp;<a rel="up" accesskey="u" href="#Top">Top</a>
 
 <p>Lets start simple, we are going to list all the references present in a
 repository.  For this we first have to open a repository with
-<pre class="lisp">     &gt; (git-open 'cl-git:repository "/Users/woudshoo/Development/Source/Lisp/cl-git/")
+<pre class="lisp">     &gt; (git-open :repository "/Users/woudshoo/Development/Source/Lisp/cl-git/")
      #&lt;CL-GIT::REPOSITORY 79002A0 {100853C603}&gt;
 </pre>
    <p>This returns a repository.  Getting a list of references is easy,
 use the generic list command and tell it you want references.
-<pre class="lisp">     &gt; (cl-git:git-list 'cl-git:reference :repository *)
+<pre class="lisp">     &gt; (cl-git:git-list :reference :repository *)
      ("refs/heads/convert-to-classes" "refs/heads/gh-pages" "refs/heads/master"
        ...
       "refs/tags/my-working-version")
@@ -214,7 +215,7 @@ We can do this explicitly with the the generic <code>git-free</code> function li
 which opens the repository, sets the special variable <code>*git-repository*</code> which holds
 the current (default) repository, and executes a body of code.   Like this:
 <pre class="lisp">     &gt; (cl-git:with-repository ("/Users/woudshoo/Development/Source/Lisp/cl-git/")
-           (cl-git:git-list 'cl-git:reference))
+           (cl-git:git-list :reference))
      ("refs/heads/convert-to-classes" "refs/heads/gh-pages"
        ... )
 </pre>
@@ -224,26 +225,26 @@ the current (default) repository, and executes a body of code.   Like this:
 to find a commit when we know the SHA-1 has.  In that case
 the process is as follows:
 
-<pre class="lisp">     &gt; (setf *repo* (cl-git:git-open 'cl-git:repository
+<pre class="lisp">     &gt; (setf *repo* (cl-git:git-open :repository
                        "/Users/woudshoo/Development/Source/Lisp/cl-git/"))
      
      #&lt;CL-GIT:REPOSITORY 94676D0 {10081A6903}&gt;
      
-     &gt; (setf *commit* (cl-git:git-lookup 'cl-git:object
+     &gt; (setf *commit* (cl-git:git-lookup :object
                          "6a9840f959df6301cba1acbc560b960a6a2787d6"
                          :repository *repo*))
      #&lt;CL-GIT:COMMIT 7915080 {1008732463}&gt;
 </pre>
    <p>Note that although we are looking up a commit we specify as class
-<code>cl-git:object</code>.  The advantage of specifying <code>cl-git:object</code> instead
-of <code>cl-git:commit</code> is that you do not need to know that the
+<code>:object</code>.  The advantage of specifying <code>:object</code> instead
+of <code>:commit</code> is that you do not need to know that the
 SHA refers to a commit.  If the SHA refers to a tag a tag will be returned.
 
    <p>However if we do not know the SHA-1 but we do know a reference, such as
 a branch name or tag.  We can get to the commit in a slightly more cumbersome way. 
 (A list of references is easy to get, see the previous section.)
 
-<pre class="lisp">     &gt; (cl-git:git-lookup 'cl-git:reference "refs/heads/master" :repository *repo*)
+<pre class="lisp">     &gt; (cl-git:git-lookup :reference "refs/heads/master" :repository *repo*)
      #&lt;CL-GIT:REFERENCE 9468390 {1008AB5263}&gt;
 </pre>
    <p>However to get from a reference to a commit is a bit of work.  First of
@@ -260,7 +261,7 @@ up the reference.
      #&lt;CL-GIT:REFERENCE 812C070 {1008B926D3}&gt;
      &gt; (cl-git:git-reference-oid *)
      1449567594127912097590291965092159144580443086963
-     &gt; (cl-git:git-lookup 'cl-git:object * :repository *repo*)
+     &gt; (cl-git:git-lookup :object * :repository *repo*)
      #&lt;CL-GIT:COMMIT 812C500 {1008D5D1D3}&gt;
 </pre>
    <p>In this case we ended up with a commit, however a reference can refer to
@@ -335,7 +336,7 @@ it is a directory.
 by extracting the OID, <code>1166326251727089714911644542196064058758301591936</code>
 and lookup this object:
 
-<pre class="lisp">     &gt; (cl-git:git-lookup 'cl-git:object
+<pre class="lisp">     &gt; (cl-git:git-lookup :object
                           1166326251727089714911644542196064058758301591936
                          :repository *repo*)
      #&lt;CL-GIT::BLOB 7915440 {1009EA5893}&gt;
@@ -369,7 +370,7 @@ entry in the tree is a sub directory.  The way to access a sub directory
 is by looking up the OID from the entry.  For this example we take the
 OID from the <samp><span class="file">src</span></samp> entry in the section above.
 
-<pre class="lisp">     &gt; (cl-git:git-lookup 'cl-git:object
+<pre class="lisp">     &gt; (cl-git:git-lookup :object
                            229929308993846155940317335928954649878590463873
                            :repository *repo*)
      #&lt;CL-GIT:TREE 812D4D0 {100A22AA93}&gt;
@@ -514,7 +515,7 @@ all dependend objects on that facilitating object are freed.
 because the repository is closed.
 
    <p>However the following, although uncertain when the repository is closed, is correct
-<pre class="lisp">     (git-lookup ... :repository (git-open 'cl-git:repository ...))
+<pre class="lisp">     (git-lookup ... :repository (git-open :repository ...))
 </pre>
    <div class="node">
 <p><hr>
@@ -697,9 +698,9 @@ Up:&nbsp;<a rel="up" accesskey="u" href="#Reference-By-Class">Reference By Class
 If that is down, it allows us to rename the functions to simpler names.
 
      <dl>
-<dt><code>git-index-add</code><dd>See <a href="#Function-git_002dindex_002dadd">Function git-index-add</a>
-<br><dt><code>git-index-clear</code><dd>See <a href="#Function-git_002dindex_002dclear">Function git-index-clear</a>
-<br><dt><code>git-index-write</code><dd>See <a href="#Function-git_002dindex_002dwrite">Function git-index-write</a>
+<dt><code>git-add</code><dd>See <a href="#Generic_002dFunction-git_002dadd">Generic-Function git-add</a>
+<br><dt><code>git-clear</code><dd>See <a href="#Generic_002dFunction-git_002dclear">Generic-Function git-clear</a>
+<br><dt><code>git-write</code><dd>See <a href="#Generic_002dFunction-git_002dwrite">Generic-Function git-write</a>
 <br><dt><code>with-repository-index</code><dd>See <a href="#Macro-with_002drepository_002dindex">Macro with-repository-index</a>
 </dl>
 
@@ -744,8 +745,22 @@ Up:&nbsp;<a rel="up" accesskey="u" href="#Top">Top</a>
 
 <div class="defun">
 &mdash; Generic Function: <b>git-author</b><var> object<a name="index-git_002dauthor-2"></a></var><br>
-<blockquote><p>Returns an alist containing the author's signature of <code>object</code>. 
-A signature is a list with the keys :name :email and :time. 
+<blockquote><p>Returns the author's signature of <code>object</code>.
+
+        <p>A signature is a list with the keys <code>:name</code> <code>:email</code> and <code>:time</code>. 
+The <code>:name</code> and <code>:email</code> values are strings, and the <code>:time</code> value is <code>local-time</code> timestamp.
+
+        <p>Example
+
+     <pre class="lisp">              (cl-git:git-author *commit*)
+              ==&gt;
+              (:NAME "Willem Rein Oudshoorn"
+               :EMAIL "woudshoo+github@xs4all.nl"
+               :TIME  @2012-05-06T18:46:35.000000+02:00)
+     </pre>
+        <p>Supported Objects
+
+        <p><code>-</code> <code>commit</code>
 </p></blockquote></div>
    <a name="Method-git_002dauthor-_0028_0028commit-commit_0029_0029"></a>
 
@@ -758,8 +773,14 @@ A signature is a list with the keys :name :email and :time.
 
 <div class="defun">
 &mdash; Generic Function: <b>git-committer</b><var> object<a name="index-git_002dcommitter-5"></a></var><br>
-<blockquote><p>Returns an alist containing the commiter's signature of <code>object</code>. 
-A signature is a list with the keys :name :email and :time. 
+<blockquote><p>Returns the committer's signature of <code>object</code>.
+
+        <p>A signature is a list with the keys <code>:name</code> <code>:email</code> and <code>:time</code>. 
+The <code>:name</code> and <code>:email</code> values are strings, and the <code>:time</code> value is <code>local-time</code> timestamp.
+
+        <p>Supported Objects
+
+        <p><code>-</code> <code>commit</code>
 </p></blockquote></div>
 
    <p><a name="index-git_002dcreate_002dfrom_002dindex-6"></a><a name="Function-git_002dcreate_002dfrom_002dindex"></a>
@@ -773,7 +794,11 @@ A signature is a list with the keys :name :email and :time.
 
 <div class="defun">
 &mdash; Generic Function: <b>git-entries</b><var> object<a name="index-git_002dentries-9"></a></var><br>
-<blockquote><p><code>todo</code>
+<blockquote><p>Returns the elements of the collection <code>object</code> as a list.
+
+        <p>Supported Objects
+
+        <p><code>-</code> The same as <code>git-entry-by-index</code> and <code>git-entry-count</code>. 
 </p></blockquote></div>
    <a name="Method-git_002dentries-_0028object_0029"></a>
 
@@ -789,14 +814,22 @@ so the objects returned are the same as the ones returned by <code>git-entry-by-
 
 <div class="defun">
 &mdash; Generic Function: <b>git-entry-by-index</b><var> object index<a name="index-git_002dentry_002dby_002dindex-12"></a></var><br>
-<blockquote><p><code>todo</code>
+<blockquote><p>Returns the element at position <code>index</code> from the collection <code>object</code>.
+
+        <p>Supported Objects
+
+        <p><code>-</code> <code>tree</code>
 </p></blockquote></div>
 
    <p><a name="index-git_002dentry_002dcount-13"></a><a name="Generic_002dFunction-git_002dentry_002dcount"></a>
 
 <div class="defun">
 &mdash; Generic Function: <b>git-entry-count</b><var> object<a name="index-git_002dentry_002dcount-14"></a></var><br>
-<blockquote><p><code>todo</code>
+<blockquote><p>Returns the number elements in the collection <code>object</code>.
+
+        <p>Supported Objects
+
+        <p><code>-</code> <code>tree</code>
 </p></blockquote></div>
 
    <p><a name="index-git_002dfree-15"></a><a name="Generic_002dFunction-git_002dfree"></a>
@@ -823,40 +856,61 @@ The identifier is typically the SHA-1 checksum or hash code.
 
      <pre class="lisp">              (format nil "~(~40,'0X~)" (git-id object))
      </pre>
-        <p>If you want to be absolutely sure what libgit2 thinks the hash string is do the following:
+        <p>Supported Objects
 
-     <pre class="lisp">              (git-oid-tostr (git-id object))
-     </pre>
-        </blockquote></div>
+          <ul>
+<li><code>commit</code>
+<li><code>object</code>
+<li><code>tag</code>
+<li><code>tree</code>
+</ul>
+        </p></blockquote></div>
 
-   <p><a name="index-git_002dindex_002dadd-19"></a><a name="Function-git_002dindex_002dadd"></a>
+   <p><a name="index-git_002dadd-19"></a><a name="Generic_002dFunction-git_002dadd"></a>
 
 <div class="defun">
-&mdash; Function: <b>git-index-add</b><var> path<a name="index-git_002dindex_002dadd-20"></a></var><br>
-<blockquote><p>Add a file at <code>path</code> to the repository, the <code>path</code> should be relative
-to the repository. 
+&mdash; Generic Function: <b>git-add</b><var> path &amp;key stage index &amp;allow-other-keys<a name="index-git_002dadd-20"></a></var><br>
+<blockquote><p>Adds the <code>path</code> to the current index <code>(*git-repository-index*) </code>or the explicit keyword argument <code>:index</code>
 </p></blockquote></div>
 
-   <p><a name="index-git_002dindex_002dclear-21"></a><a name="Function-git_002dindex_002dclear"></a>
+   <p><a name="index-git_002dclear-21"></a><a name="Generic_002dFunction-git_002dclear"></a>
 
 <div class="defun">
-&mdash; Function: <b>git-index-clear</b><var><a name="index-git_002dindex_002dclear-22"></a></var><br>
-<blockquote><p>Remove all staged data from the index at <code>*git-repository-index*</code>. 
+&mdash; Generic Function: <b>git-clear</b><var> object<a name="index-git_002dclear-22"></a></var><br>
+<blockquote><p>Clears the content of <code>object</code>
+
+        <p>Supported Objects
+
+        <p><code>-</code> <code>tree</code>
 </p></blockquote></div>
 
-   <p><a name="index-git_002dindex_002dwrite-23"></a><a name="Function-git_002dindex_002dwrite"></a>
+   <p><a name="index-git_002dwrite-23"></a><a name="Generic_002dFunction-git_002dwrite"></a>
 
 <div class="defun">
-&mdash; Function: <b>git-index-write</b><var><a name="index-git_002dindex_002dwrite-24"></a></var><br>
-<blockquote><p>Write the current index stored in <code>*git-repository-index*</code> to disk. 
+&mdash; Generic Function: <b>git-write</b><var> object<a name="index-git_002dwrite-24"></a></var><br>
+<blockquote><p>Writes the <code>object</code> to its store.
+
+        <p>Supported Objects
+
+        <p><code>-</code> <code>tree</code>
 </p></blockquote></div>
 
    <p><a name="index-git_002dmessage-25"></a><a name="Generic_002dFunction-git_002dmessage"></a>
 
 <div class="defun">
 &mdash; Generic Function: <b>git-message</b><var> object<a name="index-git_002dmessage-26"></a></var><br>
-<blockquote><p>Return the message associated with <code>object</code>. 
-</p></blockquote></div>
+<blockquote><p>Return the message associated with <code>object</code>.
+
+        <p>For example for commits this will return the commit message and
+for tags the message associated with the tag.
+
+        <p>Supported Objects
+
+          <ul>
+<li><code>commit</code>
+<li><code>tag</code>
+</ul>
+        </p></blockquote></div>
    <a name="Method-git_002dmessage-_0028_0028commit-commit_0029_0029"></a>
 
 <div class="defun">
@@ -868,14 +922,29 @@ to the repository.
 
 <div class="defun">
 &mdash; Generic Function: <b>git-name</b><var> object<a name="index-git_002dname-29"></a></var><br>
-<blockquote><p><code>todo</code>
-</p></blockquote></div>
+<blockquote><p>Returns the name of <code>object</code>, as a string.
 
-   <p><a name="index-git_002dobject_002dfree-30"></a><a name="Function-git_002dobject_002dfree"></a>
+        <p>What exactly the name is depends on the type of the object.
+
+          <ul>
+<li><code>reference</code> <code>--</code> The name of the of the reference, e.g.<code>:</code> "refs/heads/master"
+<li><code>tag</code>       <code>--</code> The name of the tag, e.g.<code>:</code> "v0.17"
+
+        </ul>
+        Supported Objects
+
+          <ul>
+<li><code>reference</code>
+<li><code>tag</code>
+</ul>
+        </p></blockquote></div>
+
+   <p><a name="index-git_002dnext-30"></a><a name="Generic_002dFunction-git_002dnext"></a>
 
 <div class="defun">
-&mdash; Function: <b>git-object-free</b><var> object<a name="index-git_002dobject_002dfree-31"></a></var><br>
-<blockquote><p>Free the git object. 
+&mdash; Generic Function: <b>git-next</b><var> walker<a name="index-git_002dnext-31"></a></var><br>
+<blockquote><p>Returns the next object for the walker. 
+If no objects are available anymore return nil. 
 </p></blockquote></div>
 
    <p><a name="index-git_002dparent_002doid-32"></a><a name="Generic_002dFunction-git_002dparent_002doid"></a>
@@ -883,7 +952,13 @@ to the repository.
 <div class="defun">
 &mdash; Generic Function: <b>git-parent-oid</b><var> object index<a name="index-git_002dparent_002doid-33"></a></var><br>
 <blockquote><p>Returns the oid of the parent with index <code>index</code> in the list of
-parents of the object <code>object</code>
+parents of the object <code>object</code>.
+
+        <p>The index is zero based and has to be less than <code>(git-parentcount object)</code>.
+
+        <p>Supported Objects
+
+        <p><code>-</code> <code>commit</code>
 </p></blockquote></div>
    <a name="Method-git_002dparent_002doid-_0028_0028commit-commit_0029-index_0029"></a>
 
@@ -897,7 +972,15 @@ parents of the commit <code>commit</code>.
 
 <div class="defun">
 &mdash; Generic Function: <b>git-parent-oids</b><var> object<a name="index-git_002dparent_002doids-36"></a></var><br>
-<blockquote><p>Returns a list of oids identifying the parent commits of <code>object</code>
+<blockquote><p>Returns a list of oids identifying the parent commits of <code>object</code>.
+
+        <p>This method is a wrapper that collects all oids returned by <code>git-parent-oid</code>. 
+So as such the meaning and applicability of this method is the same a s
+<code>git-parent-oid</code>
+
+        <p>Supported Objects
+
+        <p><code>-</code> <code>commit</code>
 </p></blockquote></div>
    <a name="Method-git_002dparent_002doids-_0028object_0029"></a>
 
@@ -910,7 +993,13 @@ parents of the commit <code>commit</code>.
 
 <div class="defun">
 &mdash; Generic Function: <b>git-parentcount</b><var> object<a name="index-git_002dparentcount-39"></a></var><br>
-<blockquote><p>Returns the number of parents of <code>object</code>. 
+<blockquote><p>Returns the number of parents of <code>object</code>.
+
+        <p>For Commits this indicate the number of parent commits.  So it is 1 for normal commits, <code>&gt;</code> 1 for merges and 0 for initial commits.
+
+        <p>Supported Objects
+
+        <p><code>-</code> <code>commit</code>
 </p></blockquote></div>
    <a name="Method-git_002dparentcount-_0028_0028commit-commit_0029_0029"></a>
 
@@ -953,14 +1042,26 @@ argument.
 
 <div class="defun">
 &mdash; Generic Function: <b>git-tagger</b><var> object<a name="index-git_002dtagger-50"></a></var><br>
-<blockquote><p><code>todo</code>
+<blockquote><p>Returns the signature of the tagger of <code>object</code>.
+
+        <p>The return value is a signature (a property list with keys <code>:name</code>, <code>:email</code> and <code>:time</code>
+
+        <p>Supported Objects
+
+        <p><code>-</code> <code>tag</code>
 </p></blockquote></div>
 
    <p><a name="index-git_002dtarget-51"></a><a name="Generic_002dFunction-git_002dtarget"></a>
 
 <div class="defun">
 &mdash; Generic Function: <b>git-target</b><var> object<a name="index-git_002dtarget-52"></a></var><br>
-<blockquote><p>Need to rewrite to return an object!<code>!</code>!<code>!</code>
+<blockquote><p>Returns the target of <code>object</code>.
+
+        <p><code>-</code> <code>tag</code> <code>--</code> only works for <code>:oid</code> tags.
+
+        <p>Supported Objects
+
+        <p><code>-</code> <code>tag</code>
 </p></blockquote></div>
 
    <p><a name="index-git_002dtree-53"></a><a name="Generic_002dFunction-git_002dtree"></a>
@@ -980,8 +1081,27 @@ argument.
 
 <div class="defun">
 &mdash; Generic Function: <b>git-type</b><var> object<a name="index-git_002dtype-57"></a></var><br>
-<blockquote><p><code>todo</code>
-</p></blockquote></div>
+<blockquote><p>Returns the type of <code>object</code>.
+
+        <p>What exactly is returned depends on the class of <code>object</code>.
+
+          <ul>
+<li><code>reference</code> <code>--</code> returns either <code>:symbolic</code> or <code>:oid</code>
+<li><code>tag</code> <code>--</code> <code>?</code>?<code>?</code>
+<li><code>object</code> (and subclasses) <code>--</code> Type e.g. <code>:commit</code>, <code>:tree</code>, <code>:reference</code>
+
+        </ul>
+        Note that although <code>reference</code> is a subclass of <code>object</code> it will not
+return <code>:reference</code>, but the more specific type.
+
+        <p>Supported Objects
+
+          <ul>
+<li><code>object</code>
+<li><code>tag</code>
+<li><code>reference</code>
+</ul>
+        </p></blockquote></div>
    <a name="Method-git_002dtype-_0028_0028object-reference_0029_0029"></a>
 
 <div class="defun">
@@ -1028,18 +1148,10 @@ flags <code>:sha</code>, <code>:head</code> or <code>:both</code>.
 <code>walker-next</code>. 
 </p></blockquote></div>
 
-   <p><a name="index-walker_002dnext-66"></a><a name="Generic_002dFunction-walker_002dnext"></a>
+   <p><a name="index-bind_002dgit_002dcommits-66"></a><a name="Macro-bind_002dgit_002dcommits"></a>
 
 <div class="defun">
-&mdash; Generic Function: <b>walker-next</b><var> walker<a name="index-walker_002dnext-67"></a></var><br>
-<blockquote><p>Returns the next object for the walker. 
-If no objects are available anymore return nil. 
-</p></blockquote></div>
-
-   <p><a name="index-bind_002dgit_002dcommits-68"></a><a name="Macro-bind_002dgit_002dcommits"></a>
-
-<div class="defun">
-&mdash; Macro: <b>bind-git-commits</b><var> bindings &amp;body body<a name="index-bind_002dgit_002dcommits-69"></a></var><br>
+&mdash; Macro: <b>bind-git-commits</b><var> bindings &amp;body body<a name="index-bind_002dgit_002dcommits-67"></a></var><br>
 <blockquote><p>Lookup commits specified in the bindings.  The bindings syntax is
 similar to the <code>let</code> syntax except instead of needing to specify an
 initial form key arguments are used.  Atleast one key arguments <code>sha</code> or
@@ -1047,28 +1159,28 @@ initial form key arguments are used.  Atleast one key arguments <code>sha</code>
 ref path. 
 </p></blockquote></div>
 
-   <p><a name="index-with_002dgit_002drevisions-70"></a><a name="Macro-with_002dgit_002drevisions"></a>
+   <p><a name="index-with_002dgit_002drevisions-68"></a><a name="Macro-with_002dgit_002drevisions"></a>
 
 <div class="defun">
-&mdash; Macro: <b>with-git-revisions</b> (<var>commit &amp;rest rest &amp;key sha head repository</var>)<var> &amp;body body<a name="index-with_002dgit_002drevisions-71"></a></var><br>
+&mdash; Macro: <b>with-git-revisions</b> (<var>commit &amp;rest rest &amp;key sha head repository</var>)<var> &amp;body body<a name="index-with_002dgit_002drevisions-69"></a></var><br>
 <blockquote><p>Iterate aver all the revisions, the symbol specified by <code>commit</code> will
 be bound to each commit during each iteration.  This uses a return
 special call to stop iteration. 
 </p></blockquote></div>
 
-   <p><a name="index-with_002drepository_002dindex-72"></a><a name="Macro-with_002drepository_002dindex"></a>
+   <p><a name="index-with_002drepository_002dindex-70"></a><a name="Macro-with_002drepository_002dindex"></a>
 
 <div class="defun">
-&mdash; Macro: <b>with-repository-index</b><var> &amp;body body<a name="index-with_002drepository_002dindex-73"></a></var><br>
+&mdash; Macro: <b>with-repository-index</b><var> &amp;body body<a name="index-with_002drepository_002dindex-71"></a></var><br>
 <blockquote><p>Load a repository index uses the current <code>*git-repository*</code> as the
 current repository and sets <code>*git-repository-index*</code> as the newly opened
 index. 
 </p></blockquote></div>
 
-   <p><a name="index-with_002drepository-74"></a><a name="Macro-with_002drepository"></a>
+   <p><a name="index-with_002drepository-72"></a><a name="Macro-with_002drepository"></a>
 
 <div class="defun">
-&mdash; Macro: <b>with-repository</b> (<var>path</var>)<var> &amp;body body<a name="index-with_002drepository-75"></a></var><br>
+&mdash; Macro: <b>with-repository</b> (<var>path</var>)<var> &amp;body body<a name="index-with_002drepository-73"></a></var><br>
 <blockquote><p>Evaluates the body with <code>*git-repository*</code> bound to a newly opened
 repositony at path. 
 </p></blockquote></div>
@@ -1090,38 +1202,37 @@ Up:&nbsp;<a rel="up" accesskey="u" href="#Top">Top</a>
 <h2 class="appendix">Appendix A Function Index</h2>
 
 <ul class="index-fn" compact>
-<li><a href="#index-bind_002dgit_002dcommits-68"><code>bind-git-commits</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-git_002dauthor-1"><code>git-author</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-bind_002dgit_002dcommits-66"><code>bind-git-commits</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-git_002dadd-19"><code>git-add</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-git_002dauthor-2"><code>git-author</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-git_002dclear-21"><code>git-clear</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-git_002dcommitter-4"><code>git-committer</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-git_002dcreate_002dfrom_002dindex-7"><code>git-create-from-index</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-git_002dentries-9"><code>git-entries</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-git_002dcreate_002dfrom_002dindex-6"><code>git-create-from-index</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-git_002dentries-10"><code>git-entries</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-git_002dentry_002dby_002dindex-12"><code>git-entry-by-index</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-git_002dentry_002dcount-13"><code>git-entry-count</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-git_002dfree-16"><code>git-free</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-git_002dfree-15"><code>git-free</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-git_002did-18"><code>git-id</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-git_002dindex_002dadd-20"><code>git-index-add</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-git_002dindex_002dclear-22"><code>git-index-clear</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-git_002dindex_002dwrite-24"><code>git-index-write</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-git_002dmessage-27"><code>git-message</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-git_002dname-29"><code>git-name</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-git_002dobject_002dfree-31"><code>git-object-free</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-git_002dparent_002doid-33"><code>git-parent-oid</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-git_002dparent_002doids-36"><code>git-parent-oids</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-git_002dnext-31"><code>git-next</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-git_002dparent_002doid-34"><code>git-parent-oid</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-git_002dparent_002doids-35"><code>git-parent-oids</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-git_002dparentcount-39"><code>git-parentcount</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-git_002draw_002dcontent-42"><code>git-raw-content</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-git_002draw_002dsize-44"><code>git-raw-size</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-git_002draw_002dsize-43"><code>git-raw-size</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-git_002dreference_002doid-46"><code>git-reference-oid</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-git_002dresolve-48"><code>git-resolve</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-git_002dtagger-50"><code>git-tagger</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-git_002dtarget-52"><code>git-target</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-git_002dtree-55"><code>git-tree</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-git_002dtree-54"><code>git-tree</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-git_002dtype-58"><code>git-type</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-git_002dvalues-61"><code>git-values</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-git_002dvalues-60"><code>git-values</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-git_002dwrite-24"><code>git-write</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-make_002dcommit-63"><code>make-commit</code></a>: <a href="#Functions">Functions</a></li>
 <li><a href="#index-revision_002dwalk-65"><code>revision-walk</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-walker_002dnext-67"><code>walker-next</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-with_002dgit_002drevisions-71"><code>with-git-revisions</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-with_002drepository-75"><code>with-repository</code></a>: <a href="#Functions">Functions</a></li>
-<li><a href="#index-with_002drepository_002dindex-72"><code>with-repository-index</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-with_002dgit_002drevisions-69"><code>with-git-revisions</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-with_002drepository-72"><code>with-repository</code></a>: <a href="#Functions">Functions</a></li>
+<li><a href="#index-with_002drepository_002dindex-71"><code>with-repository-index</code></a>: <a href="#Functions">Functions</a></li>
    </ul></body></html>
 
