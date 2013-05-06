@@ -1,7 +1,7 @@
 ;;; -*- Mode: Lisp; Syntax: COMMON-LISP; Base: 10 -*-
 
 ;; cl-git an Common Lisp interface to git repositories.
-;; Copyright (C) 2011-2012 Russell Sim <russell.sim@gmail.com>
+;; Copyright (C) 2011-2013 Russell Sim <russell.sim@gmail.com>
 ;;
 ;; This program is free software: you can redistribute it and/or
 ;; modify it under the terms of the GNU Lesser General Public License
@@ -22,17 +22,102 @@
 
 (in-suite :cl-git)
 
-(test create-references
-  "create a repository and add a file to it and a commit, then create
-a reference from the commit."
-  (tempory-repository
-      (path)
-    (cl-git:with-repository (path)
-      (let ((oid (commit-random-file-modification
-                  path "test" "Test commit")))
-        (let ((reference (cl-git:git-create :reference
-                          "refs/heads/test" :target oid)))
-          (is
-           (equal
-            (sort-strings (list (cl-git:git-name reference) "refs/heads/master"))
-            (sort-strings (cl-git:git-list :reference)))))))))
+(def-fixture reference-with-context ()
+  (with-test-repository ()
+    (let* ((test-commit (make-test-revision))
+           (ref-default (git-create :reference "refs/heads/oid"
+                                    :target (getf test-commit :sha)))
+           (ref-symbolic (git-create :reference "refs/heads/symbolic"
+                                     :target "refs/heads/oid"
+                                     :type :symbolic)))
+      (declare (ignorable ref-symbolic) (ignorable ref-default))
+      (&body))))
+
+(def-fixture reference ()
+  (with-test-repository ()
+      (let ((test-commit (make-test-revision)))
+        (git-create :reference "refs/heads/oid"
+                    :target (getf test-commit :sha)))
+    (git-create :reference "refs/heads/symbolic"
+                :target "refs/heads/oid"
+                :type :symbolic)
+    (&body)))
+
+(def-test references-list-oid (:fixture reference)
+  (is
+   (equal ;; test the git-list default args.
+    (sort-strings (list "refs/heads/oid" "refs/heads/master"))
+    (sort-strings (git-list :reference)))))
+
+(def-test references-list-symbolic (:fixture reference)
+  (is
+   (equal
+    (sort-strings (list "refs/heads/oid" "refs/heads/symbolic" "refs/heads/master"))
+    (sort-strings (git-list :reference :flags '(:oid :symbolic))))))
+
+(def-test reference-lookup-oid (:fixture reference)
+  (is
+   (equal (git-name (git-lookup :reference "refs/heads/oid"))
+          "refs/heads/oid")))
+
+(def-test reference-lookup-symbolic (:fixture reference)
+  (is
+   (equal (git-name (git-lookup :reference "refs/heads/symbolic"))
+          "refs/heads/symbolic")))
+
+(def-test reference-accessors-oid (:fixture reference-with-context)
+  "Create oid reference and check accessors."
+  (is (equal
+       (git-type ref-default)
+       '(:OID)))
+  (is (equal
+       (git-name ref-default)
+       "refs/heads/oid")))
+
+(def-test reference-accessors-symbolic (:fixture reference-with-context)
+  "Create symbolic reference and check it's name."
+  (is (equal
+       (git-type ref-symbolic)
+       '(:SYMBOLIC)))
+  (is (equal
+       (git-name ref-symbolic)
+       "refs/heads/symbolic")))
+
+(def-test reference-target-oid (:fixture reference-with-context)
+  "Check that the returned commit id matches the id from the reference
+fixture"
+  (is (equal
+       (git-id (git-target ref-default))
+       (getf test-commit :sha)))
+  (is (equal
+       (git-target ref-default :type :oid)
+       (getf test-commit :sha))))
+
+(def-test reference-target-symbolic (:fixture reference-with-context)
+  "Check that the returned commit id matches the id from the reference
+fixture"
+  (signals unresolved-reference-error
+    (git-id (git-target ref-symbolic)))
+  (is (equal
+       (git-id (git-target (git-resolve ref-symbolic)))
+       (getf test-commit :sha))))
+
+
+(def-test reference-is-branch (:fixture reference)
+  "Check that the ref is a branch."
+  (is (equal
+       (git-is-branch (git-lookup :reference "refs/heads/oid"))
+       t)))
+
+(def-test reference-is-not-remote (:fixture reference)
+  "Check that the ref is a branch."
+  (is (equal
+       (git-is-remote (git-lookup :reference "refs/heads/oid"))
+       nil)))
+
+;; TODO add test for the positive case
+(def-test reference-has-reflog (:fixture reference-with-context)
+  "Check that the ref has a reflog."
+  (is (equal
+       (git-has-log ref-default)
+       nil)))

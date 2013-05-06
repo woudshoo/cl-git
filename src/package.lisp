@@ -76,6 +76,9 @@
    #:git-init
    #:git-free
 
+   ;; errors
+   #:unresolved-reference-error
+
    ;; Bigger functions
    #:make-commit
 
@@ -102,6 +105,7 @@
    #:git-tracking
    #:git-version
    #:git-peel
+   #:git-index
    #:git-load
    #:git-push-url
    #:git-url

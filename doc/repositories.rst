@@ -7,6 +7,12 @@ Repositories
 
 .. cl:variable:: *git-repository*
 
+.. cl:method:: git-config repository
+
+.. cl:method:: git-index repository
+
+.. cl:method:: git-odb repository
+
 Creating
 --------
 
@@ -45,6 +51,19 @@ Status
 ------
 
 .. cl:function:: git-status
+
+
+.. code-block:: common-lisp
+
+   CL-GIT> (with-repository (#p"/home/russell/projects/lisp/cl-git/")
+              (git-status))
+
+   (("src/status.lisp" :CURRENT :WORKTREE-MODIFIED)
+    ("src/package.lisp" :CURRENT :WORKTREE-MODIFIED)
+    ("fabfile.pyc" :CURRENT :IGNORED)
+    ("doc/repositories.rst" :CURRENT :WORKTREE-MODIFIED)
+    ("doc/cl-git.html" :CURRENT :WORKTREE-NEW)
+    ("doc/.installed.cfg" :CURRENT :IGNORED))
 
 .. cl:method:: git-head repository
 

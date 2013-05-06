@@ -28,18 +28,18 @@
 ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 (defbitfield git-status-flags
-  (:index-new        1)
-  (:index-modified   2)
-  (:index-deleted    4)
-  (:index-renamed    8)
-  (:index-typechanged 16)
-  ;;;
-  (:worktree-new      128)
+  (:current 0)
+  (:index-new 1)
+  (:index-modified 2)
+  (:index-deleted 4)
+  (:index-renamed 8)
+  (:index-typechange 16)
+  (:worktree-new 128)
   (:worktree-modified 256)
-  (:worktree-deleted  512)
-  (:ignored           16384))
+  (:worktree-deleted 512)
+  (:worktree-typechange 1024)
+  (:ignored 16384))
 
 (defcfun ("git_status_foreach" %git-status-for-each)
     %return-value
@@ -61,9 +61,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+
 (defun git-status (&key (repository *git-repository*))
   "Return the current status values for each of the object in the
-repository."
+repository.  For each element of the list the FIRST is the name of the
+file and the CDR is a list of keywords that containing the current
+state of the file.  Possible states are: :CURRENT :INDEX-NEW :INDEX-MODIFIED
+:INDEX-DELETED :INDEX-RENAMED :INDEX-TYPECHANGE :WORKTREE-NEW :WORKTREE-MODIFIED
+:WORKTREE-DELETED :WORKTREE-TYPECHANGE or :IGNORED"
   (let ((*status-values* (list)))
     (%git-status-for-each repository
                           (callback collect-status-values)

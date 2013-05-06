@@ -1,5 +1,6 @@
 (asdf:defsystem #:cl-git-tests
-  :depends-on (#:cl-git #:FiveAM #:cl-fad #:unix-options #:inferior-shell #:local-time)
+  :defsystem-depends-on (:asdf)
+  :depends-on (#:cl-git #:FiveAM #:cl-fad #:unix-options #:inferior-shell #:local-time #:alexandria)
   :components ((:module "tests"
                 :serial t
                 :components
