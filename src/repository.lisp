@@ -68,10 +68,26 @@
   (out :pointer)
   (repository %repository))
 
+(defcfun ("git_repository_is_empty" git-repository-is-empty)
+    :boolean
+  "Return T if the repository is empty and contains no references."
+  (repository %repository))
+
+(defcfun ("git_repository_is_bare" git-repository-is-bare)
+    :boolean
+  "Return T if the repository is bare."
+  (repository %repository))
+
 (defcfun ("git_repository_head_detached" git-head-detached)
-    %bool
-  "Returns t if the HEAD in the repository is detached, in other words,
-the HEAD reference is not a symbolic reference to a branch, but a direct reference."
+    :boolean
+  "Returns T if the HEAD in the repository is detached, in other words,
+the HEAD reference is not a symbolic reference to a branch, but a
+direct commit."
+  (repository %repository))
+
+(defcfun ("git_repository_head_orphan" git-head-orphaned)
+    :boolean
+  "Returns t if the HEAD points to a commit that doesn't exist."
   (repository %repository))
 
 (defcfun ("git_repository_path" %git-repository-path)
@@ -102,6 +118,7 @@ contains the object database."))
            :free-function #'git-repository-free)))
 
 (defmethod git-init ((class (eql :repository)) (path pathname) &rest r)
+  "Open an existing repository located at PATH."
   (apply #'git-init class (namestring path) r))
 
 (defmethod git-open ((class (eql :repository)) (path string) &key &allow-other-keys)
@@ -125,15 +142,20 @@ Or for a bare repository to the repository itself."
   "Returns the working directory for the repository."
   (%git-repository-workdir repository))
 
-(defmethod git-config ((repository repository))
-  (with-foreign-object (config :pointer)
-    (%git-repository-config config repository)
-    (make-instance 'config
-           :pointer (mem-ref config :pointer)
-           :facilitator repository
-           :free-function #'git-config-free)))
+(defmethod git-config ((repository repository) &key level)
+  (let ((config
+          (with-foreign-object (config :pointer)
+            (%git-repository-config config repository)
+            (make-instance 'config
+                           :pointer (mem-ref config :pointer)
+                           :facilitator repository
+                           :free-function #'git-config-free))))
+    (if level
+        (git-config config :level level)
+        config)))
 
 (defmethod git-index ((repository repository))
+  "Return the index of the repository."
   (with-foreign-object (index :pointer)
     (%git-repository-index index repository)
     (make-instance 'index
@@ -158,11 +180,21 @@ Or for a bare repository to the repository itself."
 		   :facilitator repository
 		   :free-function #'%git-reference-free)))
 
-(defmacro with-repository ((path) &body body)
-  "Evaluates the body with *GIT-REPOSITORY* bound to a newly opened
-repositony at path."
-  `(let ((*git-repository* (git-open :repository ,path)))
-     (unwind-protect
-      (progn
-        ,@body)
-       (git-free *git-repository*))))
+
+(defmacro with-repository ((var &optional pathname-or-string) &body body)
+  "Evaluates the body with VAR bound to a newly opened located
+repository at PATHNAME-OR-STRING.  Repository is freed upon exit of
+this scope so any objects that leave this scope will no longer be able
+to access the repository."
+  (if pathname-or-string
+      `(let ((,var (git-open :repository ,pathname-or-string)))
+         (unwind-protect
+              (progn
+                ,@body)
+           (git-free ,var)))
+      ;; XXX Backwards compatible version of the macro
+      `(let ((*git-repository* (git-open :repository ,var)))
+         (unwind-protect
+              (progn
+                ,@body)
+           (git-free *git-repository*)))))

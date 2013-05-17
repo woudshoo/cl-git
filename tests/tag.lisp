@@ -17,16 +17,26 @@
 ;; License along with this program.  If not, see
 ;; <http://www.gnu.org/licenses/>.
 
+(in-package #:cl-git-tests)
 
-(defpackage #:cl-git-tests
-  (:use #:common-lisp #:cl-git #:it.bese.FiveAM)
-  (:import-from #:alexandria
-                #:iota)
-  (:import-from #:cl-fad
-                #:file-exists-p
-                #:delete-directory-and-files)
-  (:import-from #:local-time
-                #:unix-to-timestamp
-                #:timestamp-to-unix
-                #:timestamp-difference
-                #:now))
+(in-suite :cl-git)
+
+
+(def-test list-tags (:fixture repository)
+  (is (equal (git-list :tag)
+             nil))
+  (let ((tag-name (random-string 50))
+        (tag-message (random-string 500))
+        (test-commit (make-test-revision :author (list :name (random-string 50)))))
+    (bind-git-commits ((commit :sha (getf test-commit :sha)))
+      (let ((tag
+              (make-tag tag-name tag-message
+                        :repository *git-repository*
+                        :target commit
+                        :tagger (list :name (random-string 50)
+                                      :email (random-string 50)
+                                      :time (random-time)))))
+        (is (equal (git-name tag)
+                   tag-name))))
+    (is (equal (git-list :tag)
+               (list tag-name)))))

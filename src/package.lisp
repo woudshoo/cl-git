@@ -8,6 +8,8 @@
   (:import-from #:trivial-garbage
                 #:make-weak-pointer
                 #:finalize)
+  (:import-from #:cl-fad
+                #:pathname-relative-p)
   (:import-from #:cffi
                 #:define-parse-method
                 #:define-foreign-type
@@ -25,6 +27,7 @@
                 #:with-foreign-pointer-as-string
                 #:foreign-slot-pointer
                 #:foreign-alloc
+                #:foreign-string-alloc
                 #:null-pointer
                 #:null-pointer-p
                 #:pointerp
@@ -50,6 +53,8 @@
    #:git-write
    #:git-clear
    #:git-config
+   #:git-config-open-level
+   #:git-connect
    #:git-values
    #:git-raw-size
    #:git-raw-content
@@ -79,12 +84,14 @@
    ;; errors
    #:unresolved-reference-error
 
-   ;; Bigger functions
+   ;; new objects
    #:make-commit
+   #:make-tag
 
    ;; Macros
    #:with-repository
    #:with-repository-index
+   #:with-index
    #:with-git-revisions
    #:bind-git-commits
 
@@ -99,14 +106,19 @@
    #:index
    #:tag
    #:repository
+
+   ;; variables
    #:*git-repository-index*
    #:*git-repository*
+
    #:git-capabilities
    #:git-tracking
    #:git-version
    #:git-peel
    #:git-index
+   #:git-index-has-conflicts
    #:git-load
+   #:git-read
    #:git-push-url
    #:git-url
    #:git-odb
@@ -119,9 +131,12 @@
    #:git-is-head
    #:git-write-tree
    #:git-head
+   #:git-head-orphaned
+   #:git-head-detached
+   #:git-repository-is-empty
+   #:git-repository-is-bare
    #:git-path
    #:git-workdir
-   #:git-head-detached
    #:git-has-log
    #:git-is-remote
    #:git-is-branch

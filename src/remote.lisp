@@ -59,7 +59,7 @@
 			    :total total)))
 
 (defcstruct (git-remote-head :class remote-head-struct-type)
-  (local %bool)
+  (local :boolean)
   (oid (:struct git-oid))
   (loid (:struct git-oid))
   (name :string))
@@ -72,6 +72,14 @@
 			    :name name)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defcfun ("git_remote_create" %git-remote-create)
+    %return-value
+  (remote :pointer)
+  (repository %repository)
+  (name :string)
+  (url :string))
+
 (defcfun ("git_remote_list" %git-remote-list)
     %return-value
   (strings :pointer)
@@ -100,7 +108,7 @@
   (remote %remote))
 
 (defcfun ("git_remote_connected" %git-remote-connected)
-  %bool
+  :boolean
   (remote %remote))
 
 (defcenum %direction
@@ -128,14 +136,14 @@
 (defcfun ("git_remote_download" %git-remote-download)
   %return-value
   (remote %remote)
-  (bytes :pointer)
-  (stats :pointer))
+  (callback :pointer)
+  (payload :pointer))
 
-(defcallback collect-remote-ls-values :int ((remote-head 
-					     (:pointer (:struct git-remote-head))) 
+(defcallback collect-remote-ls-values :int ((remote-head
+					     (:pointer (:struct git-remote-head)))
 					    (payload :pointer))
   (declare (ignore payload))
-  (push (convert-from-foreign remote-head '(:struct git-remote-head)) 
+  (push (convert-from-foreign remote-head '(:struct git-remote-head))
 	*remote-ls-values*)
   0)
 
@@ -148,11 +156,23 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defclass remote (git-pointer) ())
 
+
+(defmethod git-create ((class (eql :remote)) name
+                       &key url (repository *git-repository*))
+  "Create a new remote."
+  (let ((url (if (pathnamep url) (namestring url) url)))
+    (with-foreign-object (remote :pointer)
+      (%git-remote-create remote repository name url)
+      (make-instance 'remote
+                     :pointer (mem-ref remote :pointer)
+                     :facilitator repository
+                     :free-function #'%git-remote-free))))
+
 (defmethod git-list ((class (eql :remote))
              &key (repository *git-repository*))
   (with-foreign-object (string-array '(:struct git-strings))
     (%git-remote-list string-array repository)
-    (prog1 
+    (prog1
 	(convert-from-foreign string-array '%git-strings)
       (free-translated-object string-array '%git-strings t))))
 
@@ -170,12 +190,13 @@
   (%git-remote-name remote))
 
 (defmethod git-connect ((remote remote) &key (direction :fetch))
-  "Opens the remote connection.  
-The url used for the connection can be queried by `git-url'.
+  "Opens the remote connection.
+The url used for the connection can be queried by GIT-URL.
 
-The opened connection is one way, either data is retrieved from the remote, 
-or data is send to the remote.  The direction is specified with the :direction argument,
-:fetch is for retrieving data, :push is for sending data."
+The opened connection is one way, either data is retrieved from the
+remote, or data is send to the remote.  The direction is specified
+with the DIRECTION argument, :FETCH is for retrieving data, :PUSH is
+for sending data."
   (%git-remote-connect remote direction))
 
 (defmethod git-connected ((remote remote))
@@ -203,9 +224,7 @@ See also git-pushspec."
   (%git-remote-fetchspec remote))
 
 (defmethod git-download ((remote remote))
-  (with-foreign-object (stats '(:struct git-indexer-stats))
-    (with-foreign-object (bytes 'off-t)
-      (%git-remote-download remote bytes stats))))
+  (%git-remote-download remote (cffi-sys:null-pointer) (cffi-sys:null-pointer)))
 
 (defmethod git-ls ((remote remote))
   (let ((*remote-ls-values* (list)))

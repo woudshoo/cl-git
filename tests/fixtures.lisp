@@ -18,15 +18,17 @@
 ;; <http://www.gnu.org/licenses/>.
 
 
-(defpackage #:cl-git-tests
-  (:use #:common-lisp #:cl-git #:it.bese.FiveAM)
-  (:import-from #:alexandria
-                #:iota)
-  (:import-from #:cl-fad
-                #:file-exists-p
-                #:delete-directory-and-files)
-  (:import-from #:local-time
-                #:unix-to-timestamp
-                #:timestamp-to-unix
-                #:timestamp-difference
-                #:now))
+(in-package #:cl-git-tests)
+
+(in-suite :cl-git)
+
+
+(def-fixture repository (&key bare)
+  (with-test-repository (:bare bare)
+    (&body)))
+
+
+(def-fixture repository-with-commits ()
+  (with-test-repository ()
+    (make-test-revisions 10)
+    (&body)))

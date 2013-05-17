@@ -216,11 +216,15 @@ This is to follow symbolic tag chains to find the object pointed to.
   (:documentation "Returns the element at position INDEX from the
 collection OBJECT."))
 
+(defgeneric git-entry-by-path (object path)
+  (:documentation "Returns the element at location PATH from the
+collection OBJECT."))
+
 (defgeneric git-entries (object &key start end)
   (:documentation "Returns the elements of the collection OBJECT as a
-list.  The start and end keyword arguments allow to retrieve a subset of all elements.
-All entries with index satisfying 
-  
+list.  The start and end keyword arguments allow to retrieve a subset
+of all elements.  All entries with index satisfying
+
    start <= index < end
 
 are returned.  If end is not specified or nil, no end condition exists.
@@ -233,7 +237,10 @@ start defaults to 0."))
   (:documentation "TODO"))
 
 
-(defgeneric git-config (object))
+(defgeneric git-config (object &key level)
+  (:documentation "Open a git config.  LEVEL can be used to limit the
+git config to a specific level.  Possible levels are :HIGHEST-LEVEL
+:SYSTEM :XDG :GLOBAL or :LOCAL"))
 
 (defgeneric git-index (object)
   (:documentation "Returns an index object for OBJECT (a repository)"))
@@ -245,13 +252,13 @@ objects are available anymore return nil."))
 (defgeneric git-connect (object &key &allow-other-keys)
   (:documentation "Connects the object if applicable.
 
-At the moment only supported for 
+At the moment only supported for
 - REMOTE"))
 
 (defgeneric git-disconnect (object)
   (:documentation "Disconnects the object if applicable.
 
-At the moment only supported for 
+At the moment only supported for
 - REMOTE"))
 
 (defgeneric git-connected (object)

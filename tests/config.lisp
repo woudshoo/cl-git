@@ -18,15 +18,14 @@
 ;; <http://www.gnu.org/licenses/>.
 
 
-(defpackage #:cl-git-tests
-  (:use #:common-lisp #:cl-git #:it.bese.FiveAM)
-  (:import-from #:alexandria
-                #:iota)
-  (:import-from #:cl-fad
-                #:file-exists-p
-                #:delete-directory-and-files)
-  (:import-from #:local-time
-                #:unix-to-timestamp
-                #:timestamp-to-unix
-                #:timestamp-difference
-                #:now))
+(in-package #:cl-git-tests)
+
+(in-suite :cl-git)
+
+(def-test repository-config (:fixture (repository))
+  (is (equal
+       (git-values (git-config *git-repository* :level :local))
+       '((:name "core.filemode" :value "true" :level :local)
+         (:name "core.logallrefupdates" :value "true" :level :local)
+         (:name "core.bare" :value "false" :level :local)
+         (:name "core.repositoryformatversion" :value "0" :level :local)))))
