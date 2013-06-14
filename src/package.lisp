@@ -1,15 +1,20 @@
 ;;;; package.lisp
 
 (defpackage #:cl-git
+  (:nicknames :git)
   (:use #:cl)
   (:import-from #:anaphora
+                #:awhen
                 #:acond
                 #:it)
   (:import-from #:trivial-garbage
                 #:make-weak-pointer
+                #:cancel-finalization
                 #:finalize)
   (:import-from #:cl-fad
                 #:pathname-relative-p)
+  (:import-from #:alexandria
+                #:ensure-list)
   (:import-from #:cffi
                 #:define-parse-method
                 #:define-foreign-type
@@ -44,103 +49,133 @@
                 #:pointer-address
                 #:defcenum)
   (:export
-   #:revision-walk
-   #:walker-next
+   ;; LibGit2 Library
+   #:libgit2-capabilities
+   #:libgit2-version
 
-   #:git-create
-   #:git-resolve
-   #:git-add
-   #:git-write
-   #:git-clear
+   ;; Config
+   #:config
    #:git-config
    #:git-config-open-level
-   #:git-connect
    #:git-values
-   #:git-raw-size
-   #:git-raw-content
-   #:git-status
-   #:git-id
-   #:git-message
-   #:git-author
-   #:git-committer
-   #:git-parentcount
-   #:git-parent-oid
-   #:git-parent-oids
-   #:git-tree
-   #:git-lookup
-   #:git-list
-   #:git-name
-   #:git-next
-   #:git-tagger
-   #:git-type
-   #:git-target
+
+   ;; Git Objects
+   #:free
+   #:full-name
+   #:get-object
+   #:git-entries
    #:git-entry-count
    #:git-entry-by-index
-   #:git-entries
-   #:git-open
-   #:git-init
-   #:git-free
-
-   ;; errors
-   #:unresolved-reference-error
-
-   ;; new objects
-   #:make-commit
-   #:make-tag
-
-   ;; Macros
-   #:with-repository
-   #:with-repository-index
-   #:with-index
-   #:with-git-revisions
-   #:bind-git-commits
-
-   ;; Classes.
-   #:blob
-   #:reference
-   #:commit
-   #:tree
-   #:remote
-   #:config
+   #:list-objects
+   #:make-object
    #:object
-   #:index
+   #:object-type
+   #:oid
+   #:reflog
+   #:short-name
+
+   ;; Errors
+   #:basic-error
+   #:not-found
+   #:exists
+   #:ambiguous-error
+   #:buffer-error
+   #:user-error
+   #:barerepo-error
+   #:orphanedhead-error
+   #:unmerged-error
+   #:non-fast-forward-error
+   #:invalid-spec-error
+   #:merge-conflict-error
+   #:passthrough
+   #:stop-iteration
+   #:unknown-error
+
+   ;; Tags
+   #:make-tag
    #:tag
-   #:repository
+   #:tagger
 
-   ;; variables
+   ;; Commits
+   #:author
+   #:bind-git-commits
+   #:commit
+   #:committer
+   #:make-commit
+   #:message
+   #:parents
+   #:revision-walk
+   #:next-revision
+
+   ;; Blobs
+   #:binary-p
+   #:blob
+   #:blob-content
+   #:blob-size
+
+   ;; References
+   #:branch-p
+   #:resolve
+   #:head-p
+   #:reference
+   #:remote-p
+   #:symbolic-p
+   #:tag-p
+   #:target
+   #:unresolved-reference-error
+   #:upstream
+
+   ;; Index
    #:*git-repository-index*
-   #:*git-repository*
-
-   #:git-capabilities
-   #:git-tracking
-   #:git-version
-   #:git-peel
-   #:git-index
-   #:git-index-has-conflicts
-   #:git-load
-   #:git-read
-   #:git-push-url
-   #:git-url
-   #:git-odb
-   #:git-size
-   #:git-data
-   #:git-download
-   #:git-fetchspec
-   #:git-pushspec
-   #:git-ls
-   #:git-is-head
+   #:git-add
+   #:git-write
    #:git-write-tree
-   #:git-head
-   #:git-head-orphaned
-   #:git-head-detached
-   #:git-repository-is-empty
-   #:git-repository-is-bare
-   #:git-path
-   #:git-workdir
+   #:index
+   #:index-clear
+   #:index-conflicts-p
+   #:index-refresh
+   #:with-index
+
+   ;; Tree
+   #:tree
+   #:get-tree
+   #:tree-directory
+
+   ;; Tree-Entries (sub-classes of blob, commit, tree or tag)
+   #:filemode
+   #:filename
+
+   ;; Odb
+   #:odb
+   #:odb-data
+   #:odb-object
+   #:odb-size
+   #:odb-type
+   #:open-odb
+
+   ;; Remote
+   #:git-ls
+   #:remote
+   #:remote-connect
+   #:remote-connected-p
+   #:remote-disconnect
+   #:remote-download
+   #:remote-fetchspec
+   #:remote-push-url
+   #:remote-pushspec
+   #:remote-url
+
+   ;; Repository
+   #:bare-p
+   #:empty-p
    #:git-has-log
-   #:git-is-remote
-   #:git-is-branch
-   #:git-upstream
-   #:git-remote-name
-   #:git-upstream-name
-   #:git-lookup-byname))
+   #:head-detached-p
+   #:head-orphaned-p
+   #:init-repository
+   #:open-repository
+   #:with-repository
+   #:repository
+   #:repository-head
+   #:repository-path
+   #:repository-status
+   #:repository-workdir))

@@ -21,12 +21,17 @@
 (defpackage #:cl-git-tests
   (:use #:common-lisp #:cl-git #:it.bese.FiveAM)
   (:import-from #:alexandria
+                #:compose
                 #:iota)
   (:import-from #:cl-fad
                 #:file-exists-p
                 #:delete-directory-and-files)
+  (:import-from #:flexi-streams
+                #:octets-to-string)
   (:import-from #:local-time
                 #:unix-to-timestamp
                 #:timestamp-to-unix
                 #:timestamp-difference
-                #:now))
+                #:now)
+  (:import-from #:cffi
+                #:pointerp))

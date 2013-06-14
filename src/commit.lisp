@@ -92,7 +92,7 @@ Commits that have more then one parent are considered to be merges."))
                                   author
                                   committer
                                   parents
-                                  (repository *git-repository*))
+                                  repository)
   "Create a new commit from the tree with the OID specified and
 MESSAGE.  Optional :UPDATE-REF is the name of the reference that will
 be updated to point to this commit.  The default value \"HEAD\" will
@@ -104,14 +104,12 @@ optional instance of a GIT-SIGNATURE the details the committer.
 
   (assert (not (null-or-nullpointer repository)))
 
-  (let ((tree (git-lookup :object oid :type :tree :repository repository))
-        (parents (if (listp parents) parents (list parents))))
+  (let ((tree (get-object 'tree oid repository))
+        (parents (ensure-list parents)))
 
     ;; lookup all the git commits
     (setq parents (mapcar #'(lambda (c)
-                              (git-lookup :object
-                                          (lookup-oid :sha c)
-                                          :repository repository))
+                              (get-object 'commit c repository))
                           parents))
 
     (with-foreign-objects ((%parents :pointer (length parents))
@@ -134,67 +132,72 @@ optional instance of a GIT-SIGNATURE the details the committer.
          tree
          (length parents)
          %parents))
-      (git-lookup :commit (convert-from-foreign newoid '%oid)
-                  :repository repository))))
+      (get-object 'commit (convert-from-foreign newoid '%oid)
+                  repository))))
 
-(defmethod git-lookup ((class (eql :commit))
-               oid &key (repository *git-repository*))
-  (git-object-lookup oid class :repository repository))
+(defun make-commit-from-oid (oid repository)
+  "Make a weak commit by oid that can be looked-up later."
+  (make-instance 'commit :oid oid
+                         :facilitator repository
+                         :free-function #'git-object-free))
 
-(defmethod git-name ((commit commit))
-  (with-foreign-pointer-as-string (str 41 :encoding :ascii)
-    (git-oid-tostr str 41 (git-id commit))))
 
-(defmethod git-message ((commit commit))
+(defmethod get-object ((class (eql 'commit)) oid repository)
+  (git-object-lookup oid class repository))
+
+(defmethod message ((commit commit))
   "Return a string containing the commit message."
   (git-commit-message commit))
 
-(defmethod git-author ((commit commit))
+(defmethod author ((commit commit))
   "Given a commit return the commit author's signature."
   (git-commit-author commit))
 
-(defmethod git-committer ((commit commit))
+(defmethod committer ((commit commit))
   (git-commit-committer commit))
 
-(defmethod git-parentcount ((commit commit))
+(defmethod parent-count ((commit commit))
   "Returns the number of parent commits of the argument COMMIT."
   (git-commit-parentcount commit))
 
-(defmethod git-parent-oid ((commit commit) index)
-  "Returns the oid of the parent with index INDEX in the list of
-parents of the commit COMMIT."
-  (git-commit-parent-oid commit index))
+(defmethod parents ((commit commit))
+  "Returns a list of oids identifying the parents of OBJECT."
+  (loop
+    :for index :from 0 :below (parent-count commit)
+    :collect (make-commit-from-oid
+              (git-commit-parent-oid commit index)
+              (facilitator commit))))
 
-(defmethod git-tree ((commit commit) &key path (repository *git-repository*))
+(defmethod get-tree ((commit commit) &key path repository)
   "Returns the TREE object of the commit."
   (let ((tree (with-foreign-object (%tree :pointer)
                 (%git-commit-tree %tree commit)
                 (make-instance-object :pointer (mem-aref %tree :pointer)
                                       :facilitator (facilitator commit)
-                                      :type :tree))))
+                                      :type 'tree))))
     (if path
         (git-tree tree :path path :repository repository)
         tree)))
 
-(defun git-commit-from-oid (oid &key (repository *git-repository*))
+(defun git-commit-from-oid (oid repository)
   "Returns a git-commit object identified by the `oid'.
 This is an extended version of GIT-COMMIT-LOOKUP.
 If the oid refers to a tag, this function will return the git-commit
 pointed to by the tag.  The call git-commit-lookup will fail."
-  (let ((git-object (git-object-lookup oid :any :repository repository)))
+  (let ((git-object (git-object-lookup oid :any repository)))
     (ecase (git-object-type git-object)
-      (:tag (git-target git-object))
+      (:tag (target git-object))
       (:commit git-object))))
 
-(defun commit-oid-from-oid (oid &key (repository *git-repository*))
+(defun commit-oid-from-oid (oid repository)
   "Returns the oid of a commit referenced by `oid'.
 If the `oid' refers to a commit the function is basically a
 no-op.  However if `oid' refers to a tag, it will return
 the oid of the target of the tag."
-  (let ((commit (git-commit-from-oid oid :repository repository)))
+  (let ((commit (git-commit-from-oid oid repository)))
     (git-object-id commit)))
 
-(defmacro bind-git-commits (bindings &body body)
+(defmacro bind-git-commits ((bindings repository-or-odb) &body body)
   "Lookup commits specified in the bindings.  The bindings syntax is
 similar to the LET syntax except instead of needing to specify an
 initial form key arguments are used.  Atleast one key arguments SHA or
@@ -209,6 +212,7 @@ ref path."
                #'(lambda (s)
                    `(setf ,(car s)
                           (git-commit-from-oid
-                           (lookup-oid ,@(cdr s)))))
+                           (lookup-oid ,@(cdr s) :repository ,repository-or-odb)
+                           ,repository-or-odb)))
                bindings)
             ,@body))))

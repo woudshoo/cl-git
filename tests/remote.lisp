@@ -26,19 +26,19 @@
   "Create a new repository and check it's remotes."
   (is
    (eq
-    (git-list :remote)
+    (list-objects 'remote *test-repository*)
     nil)))
 
 (def-test create-remote (:fixture repository-with-commits)
   "Create a remote and check it's details."
-  (git-create :remote "origin" :url "/dev/null" :repository *git-repository*)
+  (make-object 'remote "origin" *test-repository* :url "/dev/null" )
   (is
    (equal
-    (git-list :remote)
+    (mapcar #'full-name (list-objects 'remote *test-repository*))
     '("origin")))
   (is
    (equal
-    (git-url (git-load :remote "origin"))
+    (remote-url (get-object 'remote "origin" *test-repository*))
     "/dev/null")))
 
 
@@ -46,13 +46,31 @@
   "Create a new repository and check it's remotes."
   (let ((remote-repo-path (gen-temp-path)))
     (unwind-protect
-	     (git-init :repository remote-repo-path)
-         (with-repository (remote-repo remote-repo-path)
-           (git-create :remote "origin"
-                       :url (concatenate 'string "file://" (namestring *repository-path*))
-                       :repository remote-repo)
-           (let ((remote (git-load :remote "origin" :repository remote-repo)))
-             (git-connect remote)
-             (git-download remote)))
+         (progn
+           (init-repository remote-repo-path)
+           (let ((remote-repo (open-repository remote-repo-path)))
+             (make-object 'remote "origin"
+                          remote-repo
+                          :url (concatenate 'string "file://" (namestring *repository-path*)))
+             (let ((remote (get-object 'remote "origin" remote-repo)))
+               (remote-connect remote)
+               (is
+                (equal
+                 (git-ls remote)
+                 `((:local nil
+                    :oid ,(oid (repository-head *test-repository*))
+                    :loid 0
+                    :name "refs/heads/master")
+                   (:local nil
+                    :oid ,(oid (repository-head *test-repository*))
+                    :loid 0
+                    :name "HEAD"))))
+               (remote-download remote)
+               (is
+                (equal
+                 (remote-fetchspec remote)
+                 '((:src "refs/heads/*"
+                    :dst "refs/remotes/origin/*"
+                    :flags (:force :pattern))))))))
       (progn
         (delete-directory-and-files remote-repo-path)))))

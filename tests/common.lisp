@@ -38,11 +38,11 @@
   `(with-output-to-string (stream)
      (format stream ,control-string ,@format-arguments)))
 
-(defun open-test-files-p ()
+(defun open-test-files-p (repository-path)
   "check if there were any files left open from a test."
   (loop :for line
         :in (cdr (inferior-shell:run/lines (format-string "lsof -Fn -p ~S" (getpid))))
-        :when (eq 1 (search (namestring *test-repository-path*) line))
+        :when (eq 1 (search (namestring repository-path) line))
           :collect (subseq line 1 (length line))))
 
 
@@ -99,6 +99,9 @@
 (defvar *repository-path* nil
   "the path to the current test repository.")
 
+(defvar *test-repository* nil
+  "store the state of the current test repository.")
+
 (defvar *test-repository-state* nil
   "store the state of the current test repository.")
 
@@ -114,10 +117,11 @@ will update to the new head when a new commit is added.")
      (finishes
        (unwind-protect
             (progn
-              (git-init :repository *repository-path* :bare ,bare)
-              (with-repository (*repository-path*)
-                ,@body)
-              (let ((open-files (open-test-files-p)))
+              (init-repository *repository-path* :bare ,bare)
+              (let ((*test-repository* (open-repository *repository-path*)))
+                ,@body
+                (free *test-repository*))
+              (let ((open-files (open-test-files-p *repository-path*)))
                 (when open-files
                   (fail "The following files were left open ~S" open-files))))
          (progn
@@ -141,18 +145,20 @@ commit alist. The commit argument is an alist that should contain the
 keys :FILES :MESSAGE :AUTHOR :COMMITTER the returned alist will also
 contain the a :SHA containing the sha1 hash of the newly created
 commit."
-  (dolist (file (getf commit :files))
-    (funcall #'write-string-to-file (getf file :filename) (getf file :text))
-    (git-add (getf file :filename)))
-  (git-write *git-repository-index*)
-  (setf (getf commit :sha)
-        (git-id
-         (make-commit
-          (git-write-tree *git-repository-index*)
-          (getf commit :message)
-          :parents (getf commit :parents)
-          :author (getf commit :author)
-          :committer (getf commit :committer))))
+  (with-index (*git-repository-index* *test-repository*)
+    (dolist (file (getf commit :files))
+      (funcall #'write-string-to-file (getf file :filename) (getf file :text))
+      (git-add (getf file :filename) :index *git-repository-index*))
+    (git-write *git-repository-index*)
+    (setf (getf commit :sha)
+          (oid
+           (make-commit
+            (git-write-tree *git-repository-index*)
+            (getf commit :message)
+            :repository *test-repository*
+            :parents (getf commit :parents)
+            :author (getf commit :author)
+            :committer (getf commit :committer)))))
   commit)
 
 (defun random-commit (&key
@@ -173,21 +179,19 @@ commit."
   (let ((parents (if (listp parents) parents (list parents))))
     (list
      :parents parents
-     :parentcount (length parents)
      :message message
      :files files
      :author author
      :committer committer)))
 
 (defun add-test-revision (&rest rest)
-  (with-repository-index
-    (let ((args rest))
-      (setf (getf args :parents) (getf (car *test-repository-state*) :sha))
-      (push
-       (make-test-commit
-        (apply #'random-commit args))
-       *test-repository-state*)
-      (setf *test-traverse-state* *test-repository-state*))))
+  (let ((args rest))
+    (setf (getf args :parents) (getf (car *test-repository-state*) :sha))
+    (push
+     (make-test-commit
+      (apply #'random-commit args))
+     *test-repository-state*)
+    (setf *test-traverse-state* *test-repository-state*)))
 
 (defun next-test-commit ()
   "return the next commit from the traverser and move the traverser to
@@ -209,10 +213,9 @@ it's parent."
   "Convert a commit to an alist, that is the same format as the test
 commit alist."
   (list
-   :parentcount (git-parentcount commit)
-   :message (git-message commit)
-   :committer (git-committer commit)
-   :author (git-author commit)))
+   :message (message commit)
+   :committer (committer commit)
+   :author (author commit)))
 
 (defun time-to-unix (time)
   (if (integerp time)
@@ -238,8 +241,7 @@ commit alist."
                y)))
     (is (equal (getf x :message)
                (getf y :message)))
-    (is (equal (getf x :parentcount)
-               (getf y :parentcount)))
+    ;; TODO test parents
     (signature-equal (getf x :author)
                      (getf y :author))
     (signature-equal (getf x :committer)

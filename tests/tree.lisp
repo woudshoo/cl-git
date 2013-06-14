@@ -17,23 +17,27 @@
 ;; License along with this program.  If not, see
 ;; <http://www.gnu.org/licenses/>.
 
-
 (in-package #:cl-git-tests)
 
 (in-suite :cl-git)
 
 
-(def-fixture repository (&key bare)
-  (with-test-repository (:bare bare)
-    (&body)))
-
-
-(def-fixture repository-with-commits ()
-  (with-test-repository ()
-    (make-test-revisions 10)
-    (&body)))
-
-(def-fixture repository-with-commit ()
-  (with-test-repository ()
-    (make-test-revisions 1)
-    (&body)))
+(def-test tree-entries (:fixture repository-with-commit)
+  (let* ((commit (next-test-commit))
+         (object (get-object 'commit (getf commit :sha) *test-repository*)))
+    (is
+     (equal
+      (sort-strings
+       (mapcar (compose #'namestring #'filename)
+               (tree-directory (get-tree object))))
+      (sort-strings
+       (mapcar (lambda (e) (getf e :filename))
+               (getf commit :files)))))
+    (is
+     (equal
+      (mapcar (compose #'octets-to-string #'blob-content)
+       (sort (tree-directory (get-tree object)) #'string-lessp
+             :key (compose #'namestring #'filename)))
+      (mapcar (lambda (e) (getf e :text))
+       (sort (getf commit :files) #'string-lessp
+             :key (lambda (e) (getf e :filename))))))))

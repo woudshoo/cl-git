@@ -47,16 +47,12 @@
   (message :string)
   (force :boolean))
 
-(defcfun ("git_tag_type" git-tag-type)
-    git-object-type
-  (tag %tag))
-
 (defcfun ("git_tag_target" %git-tag-target)
     %return-value
-  (reference :pointer)
+  (target-out :pointer)
   (tag %tag))
 
-(defcfun ("git_tag_target" %git-tag-peel)
+(defcfun ("git_tag_peel" %git-tag-peel)
     %return-value
   (reference :pointer)
   (tag %tag))
@@ -75,12 +71,6 @@
   "Returns the message of the tag"
   (tag %tag))
 
-(defcfun ("git_tag_lookup_byname" %git-tag-lookup-byname)
-    %return-value
-  (out :pointer)
-  (repository %repository)
-  (name :string))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; Highlevel Interface
@@ -88,97 +78,115 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass tag (object)
-  ())
+  ()
+  (:documentation "Tags are used to identify interesting points in the
+repositories history."))
 
+(defgeneric tag-p (tag)
+  (:documentation
+   "Return T if the reference is within the git tag namespace.")
+  (:method ((tag string))
+    (when (eq 0 (search reference-tags-dir tag))
+      t))
+  (:method ((tag tag))
+    (tag-p (full-name tag)))
+  (:method (tag)
+    nil))
 
 (defun make-tag (name message &key
                                 repository
                                 target
                                 tagger
                                 force)
-  ;; TODO should catch exists error and offer a continue
+  "Create a tag that points to target.
+
+NAME is the name of the tag.  MESSAGE will set the message body of the
+tag.
+
+REPOSITORY is the repository that the tag will be added to.  TARGET is
+the object that the tag will point to.  TAGGER should be a signature
+plist.
+
+If FORCE is t the tag will be created, even if a tag with the same
+name already exists.  If FORCE is nil, it will return an error if that
+is the case."
+  ;; TODO (RS) should catch exists error and offer a continue.
   (with-foreign-object (newoid '(:struct git-oid))
     (with-foreign-strings ((%name name)
                            (%message message))
       (%git-tag-create newoid repository %name target tagger %message force))
-    (git-lookup :tag (convert-from-foreign newoid '%oid) :repository repository)))
+    (get-object 'tag (convert-from-foreign newoid '%oid) repository)))
 
-(defmethod git-list ((class (eql :tag))
-		     &key (repository *git-repository*))
-  "Returns a list of tag names for the repository.
 
-Important Note:  This is the list of tag names as the user thinks of tags.
-Tag objects in libgit2 and cl-git are however a different thing.
-
-Also the list of these values are the strings the user see, but not the
-strings they are identified with.  So this call is rather useless."
+(defmethod list-objects ((class (eql 'tag)) repository &key test test-not)
+  "Returns a list of tag for the repository.  If the tag is an
+annotated tag then a TAG object will be returned, otherwise it will be
+a ref with the in the tag namespace."
   (with-foreign-object (string-array '(:struct git-strings))
     (%git-tag-list string-array repository)
-    (prog1
-	(convert-from-foreign string-array '%git-strings)
-      (free-translated-object string-array '%git-strings t))))
+    (let ((refs
+            (mapcar (lambda (ref-name)
+                      (get-object 'tag
+                                  (concatenate 'string reference-tags-dir ref-name)
+                                  repository))
+                    (prog1
+                        (convert-from-foreign string-array '%git-strings)
+                      (free-translated-object string-array '%git-strings t)))))
+      (cond (test
+                (remove-if-not test refs))
+            (test-not
+             (remove-if test-not refs))
+            (t
+             refs)))))
 
-#|
-(defcallback collect-tag-values :int ((tag-name :string) (oid %oid) (payload :pointer))
-  (declare (ignore payload))
-  (push (cons tag-name oid) *tag-values*)
-  0)
+(defmethod get-object ((class (eql 'tag)) name-or-oid repository)
+  (if (tag-p name-or-oid)
+      (let* ((ref (get-object 'reference name-or-oid repository))
+             (target (target ref)))
+        (case (type-of target)
+          ('tag target)
+          (t ref)))
+      (git-object-lookup name-or-oid class repository)))
 
-(defmethod git-list ((class (eql :tag))
-		     &key (repository *git-repository*))
-  (let ((*tag-values* nil))
-    (%git-tag-foreach repository
-		      (callback collect-tag-values)
-		      (null-pointer))
-    *tag-values*))
-|#
+(defmethod full-name ((tag tag))
+  (concatenate 'string reference-tags-dir (short-name tag)))
 
-(defmethod git-lookup ((class (eql :tag))
-               oid &key (repository *git-repository*))
-  (git-object-lookup oid class :repository repository))
-
-(defmethod git-lookup-byname ((class (eql :tag)) (name string)
-			      &key (repository *git-repository*))
-  (with-foreign-object (reference :pointer)
-    (%git-tag-lookup-byname reference repository name)
-    (make-instance 'reference
-		   :pointer (mem-ref reference :pointer)
-		   :facilitator repository
-		   :free-function #'%git-reference-free)))
-
-(defmethod git-name ((tag tag))
+(defmethod short-name ((tag tag))
   (git-tag-name tag))
 
-(defmethod git-tagger ((tag tag))
-  (git-tag-tagger tag))
+(defgeneric tagger (object)
+  (:documentation "Returns the signature of the tagger of OBJECT.
 
-(defmethod git-type ((tag tag))
-  (git-tag-type tag))
+The return value is a signature (a property list with
+keys :NAME, :EMAIL and :TIME.  If the tag is not annotated then nil
+will be returned.")
+  (:method ((tag tag))
+    (git-tag-tagger tag))
+  (:method tagger ((tag reference))
+    nil))
 
-(defmethod git-message ((tag tag))
+(defmethod message ((tag tag))
   (git-tag-message tag))
 
-(defmethod git-target ((tag tag) &key (type :object))
-  "Returns the target of a tag.
-The optional :TYPE keyword arguments specifies in which form the
-target is returned:
-
-- if :TYPE is :OBJECT it will return a git object.
-- if :TYPE is :OID, it will return an OID for the target object."
+(defmethod target ((tag tag))
+  "Returns the target of a tag."
   (with-foreign-object (%object :pointer)
     (%git-tag-target %object tag)
-    (case type
-      (:object
-       (make-instance-object :pointer (mem-ref %object :pointer)
-			     :facilitator (facilitator tag)))
-      (:oid (git-object-id (mem-ref %object :pointer)))
-      (t (error "Unknown type, type should be either :oid or :object but got: ~A" type)))))
-
-(defmethod git-peel ((tag tag))
-  "Peels layers of the tag until the resulting object is not a tag anymore.
-Basically calls GIT-TARGET on tag and if the result of that is a TAG,
-repeat the process."
-  (with-foreign-object (%object :pointer)
-    (%git-tag-peel %object tag)
     (make-instance-object :pointer (mem-ref %object :pointer)
-              :facilitator (facilitator tag))))
+                          :type :any
+                          :facilitator (facilitator tag))))
+
+
+(defmethod resolve ((object tag) &optional (stop-at '(commit)))
+  "Resolve the tag target until the target object is not a tag anymore.
+Basically calls TARGET on tag and result until there is a COMMIT
+returned.
+
+Using values returns the finally found object and a list of the
+traversed objects."
+  (let ((objects
+          (do ((refs (list (target object) object)
+                     (cons (target (car refs)) refs)))
+              ((member (type-of (car refs)) stop-at)
+               refs))))
+    (values (car objects) (cdr objects))))

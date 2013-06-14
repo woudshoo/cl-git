@@ -25,7 +25,7 @@
   (:threads 1)
   (:https 2))
 
-(defcfun ("git_libgit2_capabilities" git-capabilities)
+(defcfun ("git_libgit2_capabilities" libgit2-capabilities)
   git-capabilities
   "Return a list of the libgit2 capabilities, possible values in the
 list return values are :THREADS and :HTTPS.")
@@ -53,7 +53,7 @@ list return values are :THREADS and :HTTPS.")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defun git-version ()
+(defun libgit2-version ()
   "Returns the libgit2 C-library version number as a list of three integers,
 \(major minor revision\)."
   (with-foreign-objects

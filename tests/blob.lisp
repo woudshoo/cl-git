@@ -17,23 +17,29 @@
 ;; License along with this program.  If not, see
 ;; <http://www.gnu.org/licenses/>.
 
-
 (in-package #:cl-git-tests)
 
 (in-suite :cl-git)
 
-
-(def-fixture repository (&key bare)
-  (with-test-repository (:bare bare)
-    (&body)))
-
-
-(def-fixture repository-with-commits ()
-  (with-test-repository ()
-    (make-test-revisions 10)
-    (&body)))
-
-(def-fixture repository-with-commit ()
-  (with-test-repository ()
-    (make-test-revisions 1)
-    (&body)))
+(def-test blob-content (:fixture repository-with-commit)
+  ;; TODO (RS) this test sucks, it should be sorting the tree object
+  ;; at the start.
+  (let* ((commit (next-test-commit))
+         (object (get-object 'commit (getf commit :sha) *test-repository*)))
+    (is
+     (equal
+      (sort-strings
+       (mapcar (compose #'namestring #'filename)
+               (tree-directory (get-tree object))))
+      (sort-strings
+       (mapcar (lambda (e) (getf e :filename))
+               (getf commit :files)))))
+    (is
+     (equal
+      (sort-strings
+        (mapcar (lambda (e) (getf e :text))
+                (getf commit :files)))
+      (sort-strings
+       (mapcar (compose #'(lambda (o) (octets-to-string o :external-format :utf-8))
+                        #'blob-content)
+               (tree-directory (get-tree object))))))))

@@ -82,79 +82,35 @@
 
 (defclass revision-walker (git-pointer) ())
 
-(defmethod git-next ((walker revision-walker))
-  "return a git-commit or nil if there are no more commits"
+(defmethod next-revision ((walker revision-walker))
+  "Return a git-commit or nil if there are no more commits."
   (with-foreign-object (oid '(:struct git-oid))
-    (when (= 0 (%git-revwalk-next oid walker))
-      (git-commit-from-oid oid :repository (facilitator walker)))))
+    (handler-case
+        (progn
+          (%git-revwalk-next oid walker)
+          (get-object 'commit oid (facilitator walker)))
+      (stop-iteration nil))))
 
-
-(defun git-revwalk-new (&key (repository *git-repository*))
+(defun make-revwalk (repository)
   "Create a new, empty, revwalker"
-  (assert (not (null-or-nullpointer repository)))
-
   (with-foreign-object (revwalker-pointer :pointer)
     (%git-revwalk-new revwalker-pointer repository)
-    (make-instance-revwalker :object-ptr (mem-ref revwalker-pointer :pointer)
-                 :repository repository)))
-
-(defun git-revwalk (oid-or-oids &key
-                  (ordering :time)
-                  (repository *git-repository*))
-  "Walk all the revisions from a specified OID, or OIDs.
-OID can be a single object id, or a list of object ids.
-The OIDs can be anything that can be resolved by commit-oid-from-oid.
-In general this means, commits and tags."
-  (let ((revwalker (git-revwalk-new :repository repository)))
-    (%git-revwalk-sorting revwalker ordering)
-    (loop
-       :for oid
-       :in (if (atom oid-or-oids) (list oid-or-oids) oid-or-oids)
-       :do (%git-revwalk-push revwalker
-                  (commit-oid-from-oid oid :repository repository)))
-    revwalker))
-
-
-(defun make-instance-revwalker (&key object-ptr (repository *git-repository*))
   (make-instance 'revision-walker
-         :pointer object-ptr
-         :facilitator repository
-         :free-function #'%git-revwalk-free))
+                 :pointer (mem-ref revwalker-pointer :pointer)
+                 :facilitator repository
+                 :free-function #'%git-revwalk-free)))
 
+(defun revision-walk (commits &key (ordering :time))
+  "Create a revision walker starts iteration from the COMMITS listed.
 
-(defmacro with-git-revisions ((commit &rest rest &key sha head (repository '*git-repository*)) &body body)
-  "Iterate aver all the revisions, the symbol specified by COMMIT will
-be bound to each commit during each iteration.  This uses a return
-special call to stop iteration."
-  (declare (ignore sha))
-  (declare (ignore head))
-;;  (warn "with-git-revisions is depricated, please use revision-walk instead.")
-  `(let ((oids (lookup-oids :repository ,repository ,@rest)))
-     (let ((revwalker (git-revwalk oids :repository ,repository)))
-       (with-foreign-object (oid '(:struct git-oid))
-         (block nil
-           (labels ((revision-walker ()
-                      (progn
-                        (if (= (%git-revwalk-next oid revwalker) 0)
-                            (progn
-                              (let ((,commit (git-commit-from-oid oid :repository ,repository)))
-                                ,@body)
-                              (revision-walker))))))
-             (unwind-protect
-                  (revision-walker)
-               (git-free revwalker))))))))
-
-
-(defun revision-walk (name-or-names &key (flags :both)
-                      (repository *git-repository*))
-  "Create a revision walker starts iteration from the commits listed
-in NAME-OR-NAMES.  A head or sha that matches can be filterd using the
-flags :SHA, :HEAD or :BOTH.
+The ordering can be adjusted to :NONE :TOPOLOGICAL :REVERSE or :TIME,
+which is the default.
 
 Once created iteration over commits can be done with the method
-WALKER-NEXT."
-  (let* ((names (if (listp name-or-names)
-                     name-or-names
-                     (list name-or-names)))
-         (oids (find-oids names :flags flags :repository repository)))
-    (git-revwalk oids :repository repository)))
+NEXT-REVISION method."
+  (let* ((commits (ensure-list commits))
+         (revwalker (make-revwalk (facilitator (car commits)))))
+    (%git-revwalk-sorting revwalker ordering)
+    (loop :for commit :in commits
+          :do (%git-revwalk-push revwalker (oid commit)))
+    revwalker))

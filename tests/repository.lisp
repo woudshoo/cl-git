@@ -28,48 +28,35 @@
     (finishes
       (unwind-protect
            (progn
-             (git-init :repository path :bare t)
-             (is (typep (git-open :repository path) 'repository)))
+             (init-repository path :bare t)
+             (is (typep (open-repository path) 'repository)))
         (progn
           (delete-directory-and-files path))))))
-
-(test with-repository
-  "Create a repository and test the with-repository macro."
-  (for-all ((path 'gen-temp-path))
-    (finishes
-      (unwind-protect
-	   (progn
-	     (git-init :repository path :bare t)
-	     (with-repository (path)
-           (is (typep *git-repository* 'repository))))
-	(progn
-	  (delete-directory-and-files path))))))
-
 
 (def-test repository-path (:fixture (repository :bare t))
   (is
    (equal
-    (git-path *git-repository*)
-    (namestring *repository-path*))))
+    (repository-path *test-repository*)
+    *repository-path*)))
 
 
 (def-test repository-path-workdir-bare (:fixture (repository :bare t))
   (is
    (equal
-    (git-workdir *git-repository*)
+    (repository-workdir *test-repository*)
     nil)))
 
 (def-test repository-path-workdir (:fixture (repository))
   (is
    (equal
-    (git-workdir *git-repository*)
-    (namestring *repository-path*))))
+    (repository-workdir *test-repository*)
+    *repository-path*)))
 
 (def-test repository-head (:fixture (repository))
   (let ((test-commit (make-test-revision)))
     (is
      (commit-equal
-      (git-target (git-head *git-repository*))
+      (target (repository-head *test-repository*))
       test-commit))))
 
 (def-test repository-head-detached (:fixture (repository))
@@ -77,30 +64,42 @@
   (make-test-revision)
   ;; TODO add negative test
   (is (equal
-       (git-head-detached *git-repository*)
+       (head-detached-p *test-repository*)
        nil)))
 
 (def-test is-repository-empty (:fixture (repository))
   "Check that the repository is empty."
-  (is (eq (git-repository-is-empty *git-repository*) t))
+  (is (eq (empty-p *test-repository*) t))
   (make-test-revision)
-  (is (eq (git-repository-is-empty *git-repository*) nil)))
+  (is (eq (empty-p *test-repository*) nil)))
 
 (def-test is-repository-bare (:fixture (repository :bare t))
   "Check that the repository is bare."
   (is
    (eq
-    (git-repository-is-bare *git-repository*)
+    (bare-p *test-repository*)
     t)))
 
 (def-test repository-head-orphaned (:fixture (repository))
   "Confirm that the current head is orphaned then check that not."
   ;; confirm head is orphaned
   (is (equal
-       (git-head-orphaned *git-repository*)
+       (head-orphaned-p *test-repository*)
        t))
   (make-test-revision)
   ;; confirm head no longer orphaned
   (is (equal
-       (git-head-orphaned *git-repository*)
+       (head-orphaned-p *test-repository*)
        nil)))
+
+(def-test with-repository ()
+  "Create a repository and test the with-repository macro."
+  (for-all ((path 'gen-temp-path))
+    (finishes
+      (unwind-protect
+	   (progn
+	     (init-repository :repository path :bare t)
+	     (with-repository (repository path)
+           (is (typep repository 'repository))))
+	(progn
+	  (delete-directory-and-files path))))))

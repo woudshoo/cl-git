@@ -73,6 +73,16 @@
   (target :string)
   (force :boolean))
 
+(defcfun ("git_reference_set_target" %git-reference-set-target)
+    %return-value
+  (new-reference :pointer)
+  (reference %reference)
+  (oid %oid))
+
+(defcfun ("git_reference_symbolic_target" %git-reference-symbolic-target)
+    :string
+  (reference %reference))
+
 (defcfun ("git_reference_free" %git-reference-free)
     :void
   (reference %reference))
@@ -81,12 +91,12 @@
     git-reference-flags
   (reference %reference))
 
-(defcfun ("git_reference_is_branch" git-is-branch)
+(defcfun ("git_reference_is_branch" %git-is-branch)
     :boolean
   "Returns t if the reference is a local branch."
   (reference %reference))
 
-(defcfun ("git_reference_is_remote" git-is-remote)
+(defcfun ("git_reference_is_remote" %git-is-remote)
     :boolean
   "Returns t if the reference lives in the refs/remotes namespace."
   (reference %reference))
@@ -106,19 +116,62 @@
 
 (defclass reference (git-pointer) ())
 
-(defmethod git-lookup ((class (eql :reference)) name
-               &key (repository *git-repository*))
-  "Find a reference by its full name e.g.: ref/heads/master
-Note that this function name clashes with the generic lookup function.
-We need to figure this out by using the type argument to do dispatch."
+;;; XXX (RS) should probably look at using the groveller to get these
+;;; values.
+(defvar reference-dir "refs/")
+(defvar reference-heads-dir (concatenate 'string reference-dir "heads/"))
+(defvar reference-tags-dir (concatenate 'string  reference-dir "tags/"))
+(defvar reference-remotes-dir (concatenate 'string reference-dir "remotes/"))
+
+
+(defgeneric symbolic-p (reference)
+  (:documentation
+   "Return T if the reference is symbolic.")
+  (:method ((reference reference))
+    (let ((type (git-reference-type reference)))
+      (assert (eql 1 (length type)))
+      (ecase (car type)
+        (:symbolic t)
+        (:oid nil)))))
+
+(defgeneric remote-p (reference)
+  (:documentation
+   "Return T if the reference is within the git remotes namespace.")
+  (:method ((reference string))
+    (when (eq 0 (search reference-remotes-dir reference))
+      t))
+  (:method ((reference reference))
+      (remote-p (full-name reference))))
+
+(defgeneric branch-p (reference)
+  (:documentation
+   "Return T if the reference is within the git heads namespace.")
+  (:method ((reference string))
+    (when (eq 0 (search reference-heads-dir reference))
+      t))
+  (:method ((reference reference))
+    (branch-p (full-name reference))))
+
+(defmethod %git-lookup-by-name ((class (eql 'reference)) name repository)
+  "Lookup a reference by name and return a pointer to it.  This
+pointer will need to be freed manually."
   (assert (not (null-or-nullpointer repository)))
   (with-foreign-object (reference :pointer)
     (%git-reference-lookup reference repository name)
-    (make-instance 'reference
-           :pointer (mem-ref reference :pointer)
-           :facilitator repository
-           :free-function #'%git-reference-free)))
+    (mem-ref reference :pointer)))
 
+(defmethod get-object ((class (eql 'reference)) name repository)
+  "Find a reference by its full name e.g.: ref/heads/master
+Note that this function name clashes with the generic lookup function.
+We need to figure this out by using the type argument to do dispatch."
+  (make-instance 'reference
+                 :pointer (%git-lookup-by-name 'reference name repository)
+                 :facilitator repository
+                 :free-function #'%git-reference-free))
+
+;; XXX (RS) not sure what to do about this functionality, it could be
+;; expected that the user uses RESOLVE's second value to determine the
+;; OID ref, so perhaps this is redundant?
 (defun git-resolve (reference)
   "If the reference is symbolic, follow the it until it finds a non
 symbolic reference."
@@ -130,25 +183,36 @@ symbolic reference."
            :free-function #'%git-reference-free)))
 
 
-(defmethod git-list ((class (eql :reference))
-             &key (repository *git-repository*) (flags '(:oid)))
-  "List all the refs, filter by FLAGS.  The flag options
-are :INVALID, :OID, :SYMBOLIC, :PACKED or :HAS-PEEL"
+(defun make-reference-from-name (name repository)
+  "Make a weak reference by name that can be looked-up later."
+  (make-instance 'reference :name name
+                            :facilitator repository
+                            :free-function #'%git-reference-free))
 
+(defmethod list-objects ((class (eql 'reference)) repository &key test test-not)
+  "List all the refs the returned list can be filtered using a PREDICATE."
+  (assert (not (null-or-nullpointer repository)))
   (with-foreign-object (string-array '(:pointer (:struct git-strings)))
-    (%git-reference-list string-array repository flags)
-    (prog1
-	(convert-from-foreign string-array '%git-strings)
-      (free-translated-object string-array '%git-strings t))))
+    (%git-reference-list string-array repository '(:oid :symbolic :packed))
+    (let ((refs
+            (mapcar (lambda (ref-name)
+                      (make-reference-from-name ref-name repository))
+             (prog1
+                 (convert-from-foreign string-array '%git-strings)
+               (free-translated-object string-array '%git-strings t)))))
+      (cond (test
+             (remove-if-not test refs))
+            (test-not
+             (remove-if test-not refs))
+            (t
+             refs)))))
 
 
-
-(defmethod git-create ((class (eql :reference)) name
-               &key
-             (repository *git-repository*)
-             (type :oid)
-             force
-             target)
+(defmethod make-object ((class (eql 'reference)) name repository
+                       &key
+                         (type :oid)
+                         force
+                         target)
   "Create a reference to TARGET.
 The type of reference depends on TYPE.  If TYPE is :OID the value of
 TARGET should be an OID and a direct reference is created.  If TYPE
@@ -165,22 +229,21 @@ error if that is the case."
       (:symbolic
        (%git-reference-symbolic-create reference repository name target force)))
     (make-instance 'reference
-           :pointer (mem-ref reference :pointer)
-           :facilitator repository
-           :free-function #'%git-reference-free)))
+                   :pointer (mem-ref reference :pointer)
+                   :facilitator repository
+                   :free-function #'%git-reference-free)))
 
 
-
-(defun find-oid (name &key (flags :both)
-            (repository *git-repository*))
+(defun find-oid (name repository &key (flags :both))
   "Find a head or sha that matches the NAME. Possible flags
 are :SHA, :HEAD or :BOTH"
+  (assert (not (null-or-nullpointer repository)))
   (flet ((and-both (flag other-flag)
            (find flag (list :both other-flag))))
   (acond
     ((and (and-both flags :head)
           (remove-if-not (lambda (ref) (equal ref name))
-             (git-list :reference :repository repository)))
+             (list-objects 'reference repository)))
      (lookup-oid :head (car it) :repository repository))
     ((numberp name)
      (lookup-oid :sha name :repository repository))
@@ -192,44 +255,84 @@ are :SHA, :HEAD or :BOTH"
      (lookup-oid :sha name :repository repository))
     (t (error "Invalid reference named ~A." name)))))
 
-(defun find-oids (name-or-names &key (flags :both)
-                  (repository *git-repository*))
+(defun find-oids (name-or-names repository &key (flags :both))
   "Find a head or sha that matches the NAME. Possible flags
 are :SHA, :HEAD or :BOTH"
+  (assert (not (null-or-nullpointer repository)))
   (if (stringp name-or-names)
-      (find-oid name-or-names :flags flags :repository repository)
+      (find-oid name-or-names repository :flags flags)
       (loop :for name :in name-or-names
-            :collect (find-oid name :flags flags :repository repository))))
+            :collect (find-oid name repository :flags flags))))
 
-(defmethod git-type ((object reference))
-  "Return a list containing the type of the reference, either :OID
-or :SYMBOLIC"
-  (git-reference-type object))
+(defmethod full-name ((object reference))
+  (if (slot-value object 'libgit2-name)
+      (slot-value object 'libgit2-name)
+      (%git-reference-name object)))
 
-(defmethod git-name ((object reference))
-  (%git-reference-name object))
+(defmethod short-name ((object reference))
+  (let ((name (full-name object)))
+    (cond
+      ((remote-p name)
+       (subseq name (length reference-remotes-dir)))
+      ((branch-p name)
+       (subseq name (length reference-heads-dir)))
+      (t name))))
 
-(defmethod git-target ((reference reference) &key (type :object))
-  "Returns the Object that this reference points to.
+(defmethod print-object ((object reference) stream)
+  (print-unreadable-object (object stream :type t :identity t)
+    (cond
+      ((not (null-pointer-p (slot-value object 'libgit2-pointer)))
+       (format stream "~a" (full-name object)))
+      ((or (slot-value object 'libgit2-oid) (slot-value object 'libgit2-name))
+       (format stream "~a (weak)" (full-name object)))
+      ((slot-value object 'libgit2-disposed)
+       (princ "(disposed)" stream)))))
 
-The optional keyword argument :TYPE controls in which form the target
-is returned.
+(defmethod oid ((reference reference))
+  "Returns the oid that this reference points to.  If this reference
+is a symbolic reference then it will be resolved to a real reference
+first."
+  (if (symbolic-p reference)
+      (oid (target (git-resolve reference)))
+      (oid (target reference))))
 
-- if TYPE is :OBJECT it will return the git object.
-- if TYPE id :OID it will return the OID of the target.
+(defmethod target ((reference reference))
+  "Returns the Object that this reference points to.  If the reference
+is symbolic then the reference it points to will be returned."
+  (if (symbolic-p reference)
+      (get-object 'reference
+                  (%git-reference-symbolic-target reference)
+                  (facilitator reference))
+      (get-object 'object
+                  (%git-reference-target reference)
+                  (facilitator reference))))
 
-This call is only valid for direct references, this call will not
-work for symbolic references.
+(defun (setf target) (val reference)
+  (with-foreign-object (new-reference :pointer)
+    (%git-reference-set-target
+     new-reference
+     reference
+     (if (numberp val) val (oid val)))
+    (let ((old-pointer (pointer reference)))
+      ;; XXX (RS) Swap out the old pointer with a new one.  This
+      ;; should be extracted out to a function.
+      (setf (slot-value reference 'libgit2-pointer)
+            (mem-ref new-reference :pointer))
+      (cancel-finalization reference)
+      (enable-garbage-collection reference)
+      (%git-reference-free old-pointer))))
 
-To get the target of a symbolic, first call (GIT-RESOLVE reference)
-which will return a direct reference.  Than call this method."
-  (let ((oid (%git-reference-target reference))
-        (ref-type (git-type reference)))
-    (when (member :symbolic ref-type)
-      (error 'unresolved-reference-error))
-    (case type
-      (:oid oid)
-      (:object
-       (git-lookup :object oid
-		   :repository (facilitator reference)))
-      (t (error "Unknown type, type should be either :OID or :OBJECT but got: ~A" type)))))
+
+(defmethod resolve ((object reference) &optional (stop-at '(commit tag)))
+  "Resolve the reference until the resulting object is a tag or
+commit.  Basically calls TARGET until the returned object is a COMMIT
+or TAG.
+
+Using values returns the finally found object and a list of the
+traversed objects."
+  (let ((objects
+          (do ((refs (list (target object) object)
+                     (cons (target (car refs)) refs)))
+              ((member (type-of (car refs)) stop-at)
+               refs))))
+    (values (car objects) (cdr objects))))

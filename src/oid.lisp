@@ -123,27 +123,29 @@ as base 16 numbers and returns a number straight through."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defun lookup-oid (&key sha head (repository *git-repository*))
+(defun lookup-oid (&key sha head repository)
   "Returns an oid for a single commit (or tag).  It takes a single
  keyword argument, either SHA or HEAD If the keyword argument is SHA
  the value should be a SHA1 id as a string, or an OID as a number.
  The value for the HEAD keyword should be a symbolic reference to a git commit.
 
 TODO, this function is a bit messy, need to think about cleaning this up."
+  (assert (not (null-or-nullpointer repository)))
   (cond
-    (head (let* ((original-ref (git-lookup :reference head :repository repository))
+    (head (let* ((original-ref (get-object 'reference head repository))
                  (resolved-ref (git-resolve original-ref)))
-        (prog1
-        (git-target resolved-ref :type :oid)
-          (git-free original-ref)
-          (git-free resolved-ref))))
+            (prog1
+                (target resolved-ref)
+              (free original-ref)
+              (free resolved-ref))))
     (sha (oid-from-string-or-number sha))))
 
-(defun lookup-oids (&key sha head (repository *git-repository*))
+(defun lookup-oids (&key sha head repository)
   "Similar to lookup-commit, except that the keyword arguments also
  accept a list of references.  In that case it will return a list of
  oids instead of a single oid.  If the argument was a single
  reference, it will return a list containing a single oid."
+  (assert (not (null-or-nullpointer repository)))
   (flet ((lookup-loop (keyword lookup)
            (loop :for reference
                  :in (if (atom lookup) (list lookup) lookup)

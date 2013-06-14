@@ -5,7 +5,7 @@
   :version (:read-file-form "version.lisp-expr")
   :serial t
   :defsystem-depends-on (:asdf)
-  :depends-on (#:cffi #:local-time #:cl-fad #:trivial-garbage #:anaphora)
+  :depends-on (#:cffi #:local-time #:cl-fad #:trivial-garbage #:anaphora #:alexandria)
   :author "Russell Sim <russell.sim@gmail.com>"
   :licence "Lisp-LGPL"
   :components ((:static-file "cl-git.asd")
@@ -27,10 +27,10 @@
                  (:file "references" :depends-on ("package" "api" "cffi-types"))
                  (:file "reflog" :depends-on ("package" "api" "cffi-types"))
                  (:file "branch" :depends-on ("package" "api" "cffi-types"))
-                 (:file "tree" :depends-on ("package" "api" "cffi-types"))
                  (:file "commit" :depends-on ("package" "api" "cffi-types"))
                  (:file "tag" :depends-on ("package" "api" "cffi-types"))
                  (:file "blob" :depends-on ("package" "api" "cffi-types"))
+                 (:file "tree" :depends-on ("package" "api" "cffi-types" "blob" "git-pointer"))
                  (:file "config" :depends-on ("package" "api" "cffi-types"))
                  (:file "status" :depends-on ("package" "api" "cffi-types"))
                  (:file "revwalk" :depends-on ("package" "api" "cffi-types"))

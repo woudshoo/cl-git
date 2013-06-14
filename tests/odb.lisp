@@ -23,17 +23,27 @@
 (in-suite :cl-git)
 
 
-(def-fixture repository (&key bare)
-  (with-test-repository (:bare bare)
-    (&body)))
+(def-test odb-list (:fixture repository-with-commits)
+  "list all the odb objects in the database."
+  (let ((oids (list-objects :oid *test-repository*)))
+    ;; XXX (RS) this test is limited because we aren't currently
+    ;; storing a list of the trees and blobs in the
+    ;; *test-repository-state* variable.
+    (mapcar (lambda (v) (is (member (getf v :sha) oids)))
+            *test-repository-state*)))
 
-
-(def-fixture repository-with-commits ()
-  (with-test-repository ()
-    (make-test-revisions 10)
-    (&body)))
-
-(def-fixture repository-with-commit ()
-  (with-test-repository ()
-    (make-test-revisions 1)
-    (&body)))
+(def-test odb-load (:fixture repository-with-commits)
+  "load an object from the database."
+  (let* ((commit (next-test-commit))
+         (object (get-object 'odb-object (getf commit :sha) *test-repository*)))
+    (is
+     (equal
+      (oid object)
+      (getf commit :sha)))
+    (is
+     (equal
+      (odb-type0 object)
+      :commit))
+    (is
+     (search (getf (getf commit :author) :name)
+      (octets-to-string (odb-data object) :external-format :utf-8)))))

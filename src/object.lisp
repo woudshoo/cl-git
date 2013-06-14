@@ -80,12 +80,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defclass object (git-pointer)
-  ((type :accessor object-type :initarg :object-type :initform 'object
-     :documentation "A symbol indicating which libgit2 type this is.
-This slot is probably uselss in the sense that we do not necessarily know
-on creation time and if we do not know exactly what is the point?
-So this is mainly used for printing"))
+(defclass object (git-pointer) ()
   (:documentation "Object encapsulating git objects from libgit2"))
 
 (defun make-instance-object (&key pointer facilitator type)
@@ -93,28 +88,45 @@ So this is mainly used for printing"))
 OBJECT-PTR needs to point to one of the git storage types, such as:
 :commit :tag :tree or :blob.  This function is not suitable to
 wrap git pointers to repositories, config, index etc."
-
-  (let ((obj-type (case (or (unless (eq type :any) type)
-                (git-object-type pointer))
-            (:commit 'commit)
-            (:tag 'tag)
-            (:tree 'tree)
-            (:blob 'blob)
-            (:config 'config)
-            (t 'object))))
+  (let ((obj-type
+          (if (eq type :any)
+              (case (git-object-type pointer)
+                (:commit 'commit)
+                (:tag 'tag)
+                (:tree 'tree)
+                (:blob 'blob)
+                (:config 'config)
+                (t type))
+              type)))
 
     (make-instance obj-type
-           :pointer pointer
-           :facilitator facilitator
-           :object-type obj-type
-           :free-function #'git-object-free)))
+                   :pointer pointer
+                   :facilitator facilitator
+                   :free-function #'git-object-free)))
 
 (defmethod dispose ((object object))
   "Do the normal free and dispose children, but also clear reference to facilitator."
   (call-next-method object)
   (setf (facilitator object) nil))
 
-(defun git-object-lookup (oid type &key (repository *git-repository*))
+
+(defun git-object-lookup-ptr (oid type repository)
+  (assert (not (null-or-nullpointer repository)))
+  (let ((type
+          (case type
+            (commit :commit)
+            (tag :tag)
+            (tree :tree)
+            (blob :blob)
+            (tree-tree :tree)
+            (tree-blob :blob)
+            (config :config)
+            (t type))))
+    (with-foreign-object (obj-ptr :pointer)
+      (%git-object-lookup obj-ptr repository oid type)
+      (mem-ref obj-ptr :pointer))))
+
+(defun git-object-lookup (oid type repository)
   "Returns a git object which is identified by the OID.
 The type argument specifies which type is expected.  If the found
 object is not of the right type, an error will be signaled.  The type
@@ -123,48 +135,41 @@ is one of :ANY, :BAD, :COMMIT :TREE :BLOB :TAG :OFS-DELTA :REFS-DELTA.
 :ANY means return the object found, regardless of type.  Also :ANY is
 not a type of any real object, but only used for querying like in this function.
 :BAD should never occur, it indicates an error in the data store."
-
   (assert (not (null-or-nullpointer repository)))
-
-  (with-foreign-object (obj-ptr :pointer)
-    (%git-object-lookup obj-ptr repository oid type)
-    (make-instance-object :pointer (mem-ref obj-ptr :pointer)
-              :facilitator repository
-              :type type)))
+  (make-instance-object :pointer (git-object-lookup-ptr oid type repository)
+                        :facilitator repository
+                        :type type))
 
 
-
-;; Copy the documentation to the generic function so
-;; we do not have to write it twice.
-#|
-(setf (documentation #'git-lookup 'function)
-      (documentation #'git-object-lookup 'function))
-
-(setf (documentation #'git-type 'function)
-      (documentation #'git-object-type 'function))
-
-|#
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; Some generic functions
 ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmethod git-parent-oids (object)
-  "Returns a list of oids identifying the parents of OBJECT."
-  (loop
-    :for index :from 0 :below (git-parentcount object)
-    :collect (git-parent-oid object index)))
-
-(defmethod git-id ((object object))
+(defmethod oid ((object object))
   (git-object-id object))
 
+(defmethod full-name ((object object))
+  (format nil "~x" (oid object)))
 
-(defmethod git-lookup ((class (eql :object))
-               oid &key (repository *git-repository*))
-  (git-object-lookup oid :any :repository repository))
+(defmethod short-name ((object object))
+  (subseq (format nil "~x" (oid object)) 0 7))
 
-(defmethod git-type ((object object))
+(defmethod print-object ((object object) stream)
+  (print-unreadable-object (object stream :type t :identity t)
+    (cond
+      ((not (null-pointer-p (slot-value object 'libgit2-pointer)))
+       (format stream "~a" (full-name object)))
+      ((or (slot-value object 'libgit2-oid) (slot-value object 'libgit2-name))
+       (format stream "~a (weak)" (full-name object)))
+      ((slot-value object 'libgit2-disposed)
+       (princ "(disposed)" stream)))))
+
+(defmethod get-object ((class (eql 'object)) oid repository)
+  (git-object-lookup oid :any repository))
+
+(defmethod object-type ((object object))
   (git-object-type object))
 
 (defmethod git-entries (object &key (start 0) end)

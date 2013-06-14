@@ -95,11 +95,11 @@
     :void
   (remote %remote))
 
-(defcfun ("git_remote_pushurl" git-push-url)
+(defcfun ("git_remote_pushurl" %git-remote-push-url)
     :string
   (remote %remote))
 
-(defcfun ("git_remote_url" git-url)
+(defcfun ("git_remote_url" %git-remote-url)
     :string
   (remote %remote))
 
@@ -154,11 +154,12 @@
   (payload :pointer))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defclass remote (git-pointer) ())
 
 
-(defmethod git-create ((class (eql :remote)) name
-                       &key url (repository *git-repository*))
+(defmethod make-object ((class (eql 'remote)) name repository
+                       &key url)
   "Create a new remote."
   (let ((url (if (pathnamep url) (namestring url) url)))
     (with-foreign-object (remote :pointer)
@@ -168,16 +169,37 @@
                      :facilitator repository
                      :free-function #'%git-remote-free))))
 
-(defmethod git-list ((class (eql :remote))
-             &key (repository *git-repository*))
+(defmethod %git-lookup-by-name ((class (eql 'remote)) name repository)
+  "Lookup a reference by name and return a pointer to it.  This
+pointer will need to be freed manually."
+  (assert (not (null-or-nullpointer repository)))
+  (with-foreign-object (remote :pointer)
+    (%git-remote-load remote repository name)
+    (mem-ref remote :pointer)))
+
+(defun make-remote-from-name (name repository)
+  "Make a weak reference by name that can be looked-up later."
+  (make-instance 'remote :name name
+                         :facilitator repository
+                         :free-function #'%git-remote-free))
+
+(defmethod list-objects ((class (eql 'remote)) repository &key test test-not)
   (with-foreign-object (string-array '(:struct git-strings))
     (%git-remote-list string-array repository)
-    (prog1
-	(convert-from-foreign string-array '%git-strings)
-      (free-translated-object string-array '%git-strings t))))
+    (let ((remotes
+           (mapcar (lambda (remote-name)
+                     (make-remote-from-name remote-name repository))
+                   (prog1
+                       (convert-from-foreign string-array '%git-strings)
+                     (free-translated-object string-array '%git-strings t)))))
+      (cond (test
+             (remove-if-not test remotes))
+            (test-not
+             (remove-if test-not remotes))
+            (t
+             remotes)))))
 
-(defmethod git-load ((class (eql :remote))
-             name &key (repository *git-repository*))
+(defmethod get-object ((class (eql 'remote)) name repository)
   (with-foreign-object (remote-out :pointer)
     (%git-remote-load remote-out repository name)
     (make-instance 'remote
@@ -185,11 +207,29 @@
            :facilitator repository
            :free-function #'%git-remote-free)))
 
-(defmethod git-name ((remote remote))
-  "The name of the remote.  Is the opposite of git-load for a remote."
-  (%git-remote-name remote))
+(defmethod full-name ((remote remote))
+  "The name of the remote."
+  (if (slot-value remote 'libgit2-name)
+      (slot-value remote 'libgit2-name)
+      (%git-remote-name remote)))
 
-(defmethod git-connect ((remote remote) &key (direction :fetch))
+(defmethod short-name ((remote remote))
+  "The name of the remote."
+  (if (slot-value remote 'libgit2-name)
+      (slot-value remote 'libgit2-name)
+      (%git-remote-name remote)))
+
+(defmethod print-object ((object remote) stream)
+  (print-unreadable-object (object stream :type t :identity t)
+    (cond
+      ((not (null-pointer-p (slot-value object 'libgit2-pointer)))
+       (format stream "~a" (full-name object)))
+      ((or (slot-value object 'libgit2-oid) (slot-value object 'libgit2-name))
+       (format stream "~a (weak)" (full-name object)))
+      ((slot-value object 'libgit2-disposed)
+       (princ "(disposed)" stream)))))
+
+(defmethod remote-connect ((remote remote) &key (direction :fetch))
   "Opens the remote connection.
 The url used for the connection can be queried by GIT-URL.
 
@@ -199,15 +239,15 @@ with the DIRECTION argument, :FETCH is for retrieving data, :PUSH is
 for sending data."
   (%git-remote-connect remote direction))
 
-(defmethod git-connected ((remote remote))
+(defmethod remote-connected-p ((remote remote))
   "Returns t if the connection is open, nil otherwise."
   (%git-remote-connected remote))
 
-(defmethod git-disconnect ((remote remote))
+(defmethod remote-disconnect ((remote remote))
   "Disconnects an opened connection."
   (%git-remote-disconnect remote))
 
-(defmethod git-pushspec ((remote remote))
+(defmethod remote-pushspec ((remote remote))
   "Returns a list of push specifications of the remote.
 Each specification is property list with the following keys:
 
@@ -216,17 +256,26 @@ Each specification is property list with the following keys:
 - FLAGS, a combination of the following flags :FORCE, :PATTERN, :MATCHING."
   (%git-remote-pushspec remote))
 
-(defmethod git-fetchspec ((remote remote))
+(defmethod remote-fetchspec ((remote remote))
   "Returns a list of fetch specifications for the remote.
 Each specification is propety list with the keys: SRC, DST and FLAGS.
 
 See also git-pushspec."
   (%git-remote-fetchspec remote))
 
-(defmethod git-download ((remote remote))
+(defmethod remote-download ((remote remote))
+  "Download the required packfile from the remote to bring the
+repository into sync."
   (%git-remote-download remote (cffi-sys:null-pointer) (cffi-sys:null-pointer)))
 
 (defmethod git-ls ((remote remote))
   (let ((*remote-ls-values* (list)))
     (%git-remote-ls remote (callback collect-remote-ls-values) (null-pointer))
     *remote-ls-values*))
+
+(defmethod remote-push-url ((remote remote))
+  (%git-remote-push-url remote))
+
+(defmethod remote-url ((remote remote))
+  "Return the url to the remote."
+  (%git-remote-url remote))

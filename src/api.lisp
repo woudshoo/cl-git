@@ -22,13 +22,6 @@
 (in-package #:cl-git)
 
 
-(defparameter *git-repository* nil
-  "A global that stores the current Git repository.
-
-The value is used as a default argument to functions requiring a
-repository.  It is bound by (WITH-REPOSITORY ...), but can also be
-bound by the user.")
-
 (defparameter *git-repository-index* nil
   "A global that stores the current Git index.
 
@@ -36,7 +29,7 @@ This value is used as the default index for all index related
 functions.  It is set bound by (WITH-REPOSITORY-INDEX ..)  But can
 also be set by user code.")
 
-(defgeneric git-id (object)
+(defgeneric oid (object)
   (:documentation "Return the identifier of OBJECT.
 The identifier is typically the SHA-1 checksum or hash code.
 
@@ -44,15 +37,15 @@ Note that this is an integer, and not the string you typically see reported by g
 
 To get the string representation use format like this:
 
-    (format nil \"~40,'0X\" (git-id object))
+    (format nil \"~40,'0X\" (oid object))
 
 or if you want lowercase hexadecimal digits:
 
-    (format nil \"~(~40,'0X~)\" (git-id object))
+    (format nil \"~(~40,'0X~)\" (oid object))
 
 "))
 
-(defgeneric git-message (object)
+(defgeneric message (object)
   (:documentation "Return the message associated with OBJECT.
 
 For example for commits this will return the commit message and for
@@ -60,7 +53,7 @@ tags the message associated with the tag.
 
 "))
 
-(defgeneric git-author (object)
+(defgeneric author (object)
   (:documentation "Returns the author's signature of OBJECT.
 
 A signature is a list with the keys :NAME :EMAIL and :TIME.  The :NAME
@@ -74,20 +67,18 @@ Example
     (:NAME \"Willem Rein Oudshoorn\"
      :EMAIL \"woudshoo+github@xs4all.nl\"
      :TIME  @2012-05-06T18:46:35.000000+02:00)
-
 "))
 
-(defgeneric git-committer (object)
+(defgeneric committer (object)
   (:documentation "Returns the committer's signature of OBJECT.
 
 A signature is a list with the keys :NAME :EMAIL and :TIME.  The :NAME
 and :EMAIL values are strings, and the :TIME value is LOCAL-TIME
 timestamp.
-
 "))
 
 
-(defgeneric git-parentcount (object)
+(defgeneric parent-count (object)
   (:documentation "Returns the number of parents of OBJECT.
 
 For Commits this indicate the number of parent commits.  So it is 1
@@ -95,23 +86,8 @@ for normal commits, > 1 for merges and 0 for initial commits.
 
 "))
 
-(defgeneric git-parent-oid (object index)
-  (:documentation
-  "Returns the oid of the parent with index INDEX in the list of
-parents of the object OBJECT.
 
-The index is zero based and has to be less than (GIT-PARENTCOUNT OBJECT).
-"))
-
-(defgeneric git-parent-oids (object)
-  (:documentation "Returns a list of oids identifying the parent commits of OBJECT.
-
-This method is a wrapper that collects all oids returned by GIT-PARENT-OID.
-So as such the meaning and applicability of this method is the same a s
-GIT-PARENT-OID
-"))
-
-(defgeneric git-tree (object &key path repository)
+(defgeneric get-tree (object &key path repository)
   (:documentation
   "Returns the tree as a git tree object, for object OBJECT.
 
@@ -122,15 +98,22 @@ to the content of the commit.  If PATH is specified then the tree
 returned node will be a child node of the tree.
 "))
 
-(defgeneric git-create (class id/name &key repository &allow-other-keys))
+(defgeneric make-object (class id/name repository &key &allow-other-keys))
 
-(defgeneric git-lookup (class id/name &key repository &allow-other-keys)) ;; Documentation is copied in.
+(defgeneric get-object (class id/name repository)
+  (:documentation
+   "Return an object of type CLASS from the object database.  The
+lookup will use either an oid or a name to find the object."))
 
-(defgeneric git-list (class &key repository &allow-other-keys))
+(defgeneric list-objects (class repository &key test test-not))
 
-(defgeneric git-open (class path/name &key &allow-other-keys))
+(defgeneric open-repository (path/name)
+  (:documentation
+   "Open an existing repository located at PATH/NAME. The repository
+object will be garbage collected.  If it's freed explicitly then all
+related objects will have undefined behaviour."))
 
-(defgeneric git-init (class path/name &key &allow-other-keys)
+(defgeneric init-repository (path/name &key bare)
   (:documentation
    "Create a new Git repository.  CLASS should be the
 keyword :REPOSITORY.  PATH/NAME can be either an instance of a STRING
@@ -139,74 +122,54 @@ repository that does not have a local checkout, it's normally
 appropriate for the basename of the path to end in '.git'.  A
 REPOSITORY instance is returned."))
 
-(defgeneric git-load (class path/name &key &allow-other-keys))
 
-(defgeneric git-path (object)
-  (:documentation "Path to the object."))
+(defgeneric repository-path (object)
+  (:documentation "Return the path to the repository.  In the case
+where the repository isn't bare then it will be the location of the
+.git directory."))
 
-(defgeneric git-workdir (object))
+(defgeneric repository-workdir (object)
+  (:documentation "Return the path to the root of the repository."))
 
 (defgeneric git-add (path &key &allow-other-keys)
   (:documentation
    "Adds the PATH to the current index *GIT-REPOSITORY-INDEX* or the
 explicit keyword argument :INDEX"))
 
-(defgeneric git-clear (object)
+(defgeneric index-clear (object)
   (:documentation
-   "Clears the content of OBJECT
-"))
-
-(defgeneric git-read (object)
-  (:documentation
-   "Reads the OBJECT from disk or object store."))
+   "Clears the content of the index."))
 
 (defgeneric git-write (object)
   (:documentation
    "Writes the OBJECT to its store.
 "))
 
-(defgeneric git-name (object)
+(defgeneric full-name (object)
   (:documentation "Returns the name of OBJECT, as a string.
 
 What exactly the name is depends on the type of the object.
 
 - REFERENCE -- The name of the of the reference, e.g.: \"refs/heads/master\"
+- TAG       -- The name of the tag, e.g.: \"refs/tags/v0.17\"
+- OBJECT    -- The string representation of the oid, e.g. \"a742eb9f5290476daf54afb5d28429710b81e3f3\"
+"))
+
+(defgeneric short-name (object)
+  (:documentation "Returns the short name of OBJECT, as a string.
+
+What exactly the name is depends on the type of the object.
+
+- REFERENCE -- The name of the of the reference, e.g.: \"master\"
 - TAG       -- The name of the tag, e.g.: \"v0.17\"
+- OBJECT    -- The string representation of the oid, e.g. \"a742eb9\"
 "))
 
-(defgeneric git-tagger (object)
-  (:documentation "Returns the signature of the tagger of OBJECT.
+(defgeneric target (object)
+  (:documentation "Returns the target of OBJECT."))
 
-The return value is a signature (a property list with
-keys :NAME, :EMAIL and :TIME
-"))
+(defgeneric resolve (object &optional stop-at))
 
-
-(defgeneric git-type (object)
-  (:documentation "Returns the type of OBJECT.
-
-What exactly is returned depends on the class of OBJECT.
-
-- REFERENCE -- returns either :SYMBOLIC or :OID
-- TAG -- ???
-- OBJECT (and subclasses) -- Type e.g. :COMMIT, :TREE, :REFERENCE
-
-Note that although REFERENCE is a subclass of OBJECT it will not
-return :REFERENCE, but the more specific type.
-"))
-
-(defgeneric git-target (object &key &allow-other-keys)
-  (:documentation "Returns the target of OBJECT.
-
-- TAG -- only works for :OID tags.
-"))
-
-
-(defgeneric git-peel (object)
-  (:documentation "Returns the final target of OBJECT.
-
-This is to follow symbolic tag chains to find the object pointed to.
-"))
 
 (defgeneric git-entry-count (object)
   (:documentation "Returns the number elements in the collection OBJECT.
@@ -233,7 +196,7 @@ start defaults to 0."))
 (defgeneric git-values (object)
   (:documentation "TODO"))
 
-(defgeneric git-free (object)
+(defgeneric free (object)
   (:documentation "TODO"))
 
 
@@ -242,39 +205,30 @@ start defaults to 0."))
 git config to a specific level.  Possible levels are :HIGHEST-LEVEL
 :SYSTEM :XDG :GLOBAL or :LOCAL"))
 
-(defgeneric git-index (object)
+(defgeneric index (object)
   (:documentation "Returns an index object for OBJECT (a repository)"))
 
 (defgeneric git-next (walker)
   (:documentation "Returns the next object for the walker.  If no
 objects are available anymore return nil."))
 
-(defgeneric git-connect (object &key &allow-other-keys)
-  (:documentation "Connects the object if applicable.
+(defgeneric remote-connect (object &key direction)
+  (:documentation "Connects the object if applicable."))
 
-At the moment only supported for
-- REMOTE"))
+(defgeneric remote-disconnect (object)
+  (:documentation "Disconnects the object if applicable."))
 
-(defgeneric git-disconnect (object)
-  (:documentation "Disconnects the object if applicable.
+(defgeneric remote-connected-p (object)
+  (:documentation "Returns if the object is connected."))
 
-At the moment only supported for
-- REMOTE"))
+(defgeneric remote-pushspec (remote))
+(defgeneric remote-fetchspec (remote))
 
-(defgeneric git-connected (object)
-  (:documentation "Returns if the object is connected.
-
-At the moment only supported for
-- REMOTE"))
-
-(defgeneric git-pushspec (remote))
-(defgeneric git-fetchspec (remote))
-
-(defgeneric git-download (remote))
+(defgeneric remote-download (remote))
 
 (defgeneric git-ls (remote))
 
 
-(defgeneric git-head (repository))
-
-(defgeneric git-upstream (branch))
+(defgeneric open-odb (path-or-repository)
+  (:documentation "Open the ODB at the specified path or
+repository."))

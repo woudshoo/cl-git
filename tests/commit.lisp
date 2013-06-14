@@ -26,7 +26,7 @@
   "create a repository and add a file to it."
   (with-test-repository ()
     (let ((test-commit (make-test-revision)))  ;; get first commit
-      (bind-git-commits ((commit :sha (getf test-commit :sha)))
+      (bind-git-commits (((commit :sha (getf test-commit :sha))) *test-repository*)
         (commit-equal test-commit commit)))))
 
 
@@ -37,7 +37,7 @@ signature then it will be added automatically."
     (let ((test-pre-create (timestamp-to-unix (now))))
       (let ((test-post-create (timestamp-to-unix (now)))
             (test-commit (make-test-revision :author (list :name (random-string 50)))))
-        (bind-git-commits ((commit :sha (getf test-commit :sha)))
+        (bind-git-commits (((commit :sha (getf test-commit :sha))) *test-repository*)
           ;; set the email address the test data to the default.
           (setf (getf (getf test-commit :author) :email) (cl-git::default-email))
           ;; test that the time is correct
@@ -55,5 +55,26 @@ signature then it will be added automatically."
                         :author (list :name (random-string 50)
                                       :email "test@localhost"
                                       :time 1111111111))))
-      (bind-git-commits ((commit :sha (getf test-commit :sha)))
+      (bind-git-commits (((commit :sha (getf test-commit :sha))) *test-repository*)
         (commit-equal test-commit commit)))))
+
+(def-test commit-parents (:fixture repository-with-commits)
+  (let ((test-commit (next-test-commit)))
+    (is (equal
+         (oid (car (parents (get-object 'commit (getf test-commit :sha)
+                                        *test-repository*))))
+         (getf (next-test-commit) :sha)))
+    (is (equal
+         (length (parents (get-object 'commit (getf test-commit :sha)
+                                      *test-repository*)))
+         1))
+    ;; XXX (RS) this is a very low level test to make sure that the
+    ;; lazy oid loading is working.  It should probably be covered in
+    ;; a higher level test once one is written.
+    (is
+     (pointerp
+      (cl-git::pointer
+       (car
+        (parents
+         (get-object 'commit (getf test-commit :sha)
+                     *test-repository*))))))))

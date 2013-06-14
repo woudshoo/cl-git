@@ -31,11 +31,14 @@
     :pointer
   (blob %blob))
 
-(defcfun ("git_blob_rawsize" git-raw-size)
+(defcfun ("git_blob_rawsize" %git-blob-raw-size)
     size
   "The number of content bytes in the blob."
   (blob %blob))
 
+(defcfun ("git_blob_is_binary" %git-blob-is-binary)
+    :boolean
+  (blob %blob))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -47,18 +50,28 @@
   ()
   (:documentation "A git blob."))
 
-(defmethod git-lookup ((class (eql :blob))
-               oid &key (repository *git-repository*))
-  (git-object-lookup oid class :repository repository))
+(defmethod get-object ((class (eql 'blob)) oid repository)
+  (git-object-lookup oid class repository))
 
-(defun git-raw-content (blob)
-  "Returns the content of the blob BLOB as an array of UNSIGNED-BYTE's"
-  (let ((result (make-array (git-raw-size blob)
-                            :element-type '(unsigned-byte 8)
-                            :initial-element 0))
-        (content (%git-blob-raw-content blob)))
-    (loop :for index :from 0
-          :repeat (length result)
-          :do (setf (aref result index)
-                    (mem-aref content :unsigned-char index)))
-    result))
+(defgeneric blob-size (blob)
+  (:documentation "Return the size of the blob in bytes.")
+  (:method ((blob blob))
+    (%git-blob-raw-size blob)))
+
+(defgeneric blob-content (blob)
+  (:documentation "Returns the content of the blob BLOB as an array of UNSIGNED-BYTE's")
+  (:method ((blob blob))
+    (let ((result (make-array (blob-size blob)
+                              :element-type '(unsigned-byte 8)
+                              :initial-element 0))
+          (content (%git-blob-raw-content blob)))
+      (loop :for index :from 0
+            :repeat (length result)
+            :do (setf (aref result index)
+                      (mem-aref content :unsigned-char index)))
+      result)))
+
+(defgeneric binary-p (blob)
+  (:documentation "Return T if the contents of the blob is binary.")
+  (:method ((blob blob))
+    (%git-blob-is-binary blob)))

@@ -53,8 +53,8 @@ This does count the number of direct children, not recursively."
   "Returns the tree entry name."
   (tree %tree))
 
-(defcfun ("git_tree_entry_attributes" git-tree-entry-attributes)
-    :unsigned-int
+(defcfun ("git_tree_entry_filemode" git-tree-entry-filemode)
+    :int
   "Returns the tree entry attributes."
   (tree %tree))
 
@@ -78,14 +78,50 @@ This does count the number of direct children, not recursively."
 ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defclass tree (object)
+  ((filename :reader filename :initarg :filename :initform "")))
+
+(defclass tree-mixin ()
+  ((filemode :reader filemode :initarg :filemode :initform nil)
+   (filename :reader filename :initarg :filename :initform nil))
+  (:documentation "A git tree entry mixin."))
+
+(defclass tree-blob (tree-mixin blob)
+  ()
+  (:documentation "A git tree blob."))
+
+(defclass tree-tree (tree-mixin tree)
+  ()
+  (:documentation "A git tree entry."))
+
+(defclass tree-commit (tree-mixin commit)
+  ()
+  (:documentation "A git tree commit."))
+
+(defclass tree-link (tree-mixin)
+  ()
+  (:documentation "A git tree symlink."))
+
+(defun make-tree-entry (type filename mode oid repository)
+  "Make a weak reference by name that can be looked-up later."
+  (make-instance type
+                 :filename (pathname filename)
+                 :filemode mode
+                 :oid oid
+                 :facilitator repository
+                 :free-function #'git-object-free))
 
 (defmethod translate-from-foreign (value (type git-tree-entry-type))
   (unless (null-pointer-p value)
-    (list
-     :attr (git-tree-entry-attributes value)
-     :filename (git-tree-entry-name value)
-     :oid (git-tree-entry-id value)
-     :type (git-tree-entry-type value))))
+    (let ((type (git-tree-entry-type value))
+          (filename (git-tree-entry-name value)))
+      (list
+       :filemode (git-tree-entry-filemode value)
+       :filename (if (eq type :tree)
+                     (make-pathname :directory `(:relative ,filename))
+                     (pathname filename))
+       :oid (git-tree-entry-id value)
+       :type type))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -94,20 +130,9 @@ This does count the number of direct children, not recursively."
 ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defclass tree (object)
-  ())
 
-(defmethod git-lookup ((class (eql :tree))
-               oid &key (repository *git-repository*))
-  (git-object-lookup oid class :repository repository))
-
-#+nil (defun git-create-from-index (index)
-  "Write the current index to the disk and return an oid to it."
-  (assert (not (null-or-nullpointer index)))
-  (with-foreign-object (oid 'git-oid)
-    (git-tree-create-fromindex oid index)
-    (convert-from-foreign oid '%oid)))
-
+(defmethod get-object ((class (eql 'tree)) oid repository)
+  (git-object-lookup oid class repository))
 
 (defmethod git-entry-count ((object tree))
   (git-tree-entry-count object))
@@ -115,8 +140,106 @@ This does count the number of direct children, not recursively."
 (defmethod git-entry-by-index ((object tree) index)
   (git-tree-entry-by-index object index))
 
-(defmethod git-tree ((object tree) &key path (repository *git-repository*))
-  (with-foreign-string (%path path)
-    (let ((entry (git-tree-entry-byname object %path)))
-      (when entry
-        (git-lookup :object (getf entry :oid) :repository repository)))))
+;; Set up the object mappings
+;; TODO (RS) this should be a function call.
+(setf (getf object-type-mapping 'tree-link) :link)
+(setf (getf object-type-mapping 'tree-commit) :commit)
+(setf (getf object-type-mapping 'tree-tree) :tree)
+(setf (getf object-type-mapping 'tree-blob) :blob)
+
+(defun trailing-slash-p (string)
+  "Return T if the string ends in a slash."
+  (= (or (position #\/ string :from-end t) 0)
+         (1- (length string))))
+
+(defun remove-trailing-slash (string)
+  "Return trailing slash if there is one and return a string."
+  (if (trailing-slash-p string)
+      (subseq string 0 (1- (length string)))
+      string))
+
+(defun tree-pathname-match-p (in-pathname in-wildname)
+  "Match a git tree pathname, remove the trailing slash before hand."
+  (let ((in-pathname (if (trailing-slash-p (namestring in-wildname))
+                         (namestring in-pathname)
+                         (remove-trailing-slash (namestring in-pathname)))))
+    (pathname-match-p (pathname in-pathname) in-wildname)))
+
+(defun tree-entries (tree pathname)
+  (loop
+    :for index :from 0 :below (git-entry-count tree)
+    :for entry = (git-entry-by-index tree index)
+    :when (if pathname (tree-pathname-match-p (getf entry :filename)
+                                              pathname)
+              t)
+    :collect
+    (destructuring-bind (&key type filename filemode oid)
+        entry
+        (let ((type
+                (ecase type
+                  (:commit 'tree-commit)
+                  (:link 'tree-link)
+                  (:tree 'tree-tree)
+                  (:blob 'tree-blob))))
+          (make-tree-entry type
+                           (merge-pathnames filename (filename tree))
+                           filemode
+                           oid
+                           (facilitator tree))))))
+
+(defun chomp-pathname (pathname index)
+  "Split a path by out into segments by index."
+  (let ((name (pathname-name pathname))
+        (type (pathname-type pathname))
+        (size index))
+    (cond ((> (length (pathname-directory pathname)) size)
+            (let ((chomped-directory (nth size (pathname-directory pathname))))
+              (make-pathname :directory `(:relative ,chomped-directory))))
+          (t
+           (make-pathname
+            :name name
+            :type type)))))
+
+(defun split-pathname (pathname)
+  (let ((pathname-length (length (pathname-directory pathname))))
+    (if (= pathname-length 0)
+        (list pathname)
+        (let ((pathname-length (if (pathname-name pathname)
+                                   pathname-length
+                                   (1- pathname-length))))
+          (loop :for index :from 1 :upto pathname-length
+                :collect (chomp-pathname pathname index))))))
+
+(defgeneric tree-directory (tree &optional pathname)
+  (:documentation "List objects from a tree.  Optional argument pathname a wild
+pathname that the entries must match.")
+  (:method ((object tree) &optional pathname)
+      (labels ((tree-iterate (objects path)
+                 (apply #'concatenate
+                        'list
+                        (loop :for object :in objects
+                              ;; TODO (RS) only call for 'tree types?
+                              :collect (tree-entries object path)))))
+        (if pathname
+            (let ((paths (split-pathname (pathname pathname))))
+              (loop :for path :in paths
+                    :for subtrees = (tree-entries object path)
+                      :then (tree-iterate subtrees path)
+                    :finally (return subtrees)))
+            (tree-entries object pathname)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Subtrees
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmethod print-object ((object tree-mixin) stream)
+  (print-unreadable-object (object stream :type t :identity t)
+    (cond
+      ((not (null-pointer-p (slot-value object 'libgit2-pointer)))
+       (format stream "~a" (filename object)))
+      ((or (slot-value object 'libgit2-oid) (slot-value object 'libgit2-name))
+       (format stream "~a (weak)" (filename object)))
+      ((slot-value object 'libgit2-disposed)
+       (princ "(disposed)" stream)))))

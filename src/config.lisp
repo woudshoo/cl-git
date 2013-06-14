@@ -44,7 +44,7 @@
 GIT-REPOSITORY-CONFIG."
   (config %config))
 
-(defcfun ("git_config_foreach" %git-config-foreach)
+(defcfun ("git_config_foreach" %git-config-for-each)
     %return-value
   (config %config)
   (callback :pointer)
@@ -66,6 +66,7 @@ GIT-REPOSITORY-CONFIG."
 (defparameter *config-values* nil)
 
 (defcallback collect-config-values :int ((entry git-config-entry) (data :pointer))
+  (declare (ignore data))
   (with-foreign-slots ((name value level) entry (:struct git-config-entry))
     (push (list :name name :value value :level level) *config-values*))
   0);;; replace with success
@@ -82,7 +83,7 @@ GIT-REPOSITORY-CONFIG."
 (defmethod git-values ((config config))
   "Returns the key value pairs in the config as an association list."
   (let ((*config-values* (list)))
-    (%git-config-foreach config
+    (%git-config-for-each config
                          (callback collect-config-values)
                          (null-pointer))
     *config-values*))
@@ -94,5 +95,5 @@ GIT-REPOSITORY-CONFIG."
         (%git-config-open-level %config config level)
         (make-instance-object :pointer (mem-aref %config :pointer)
                               :facilitator (facilitator config)
-                              :type :config))
+                              :type 'config))
       config))

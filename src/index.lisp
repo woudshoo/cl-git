@@ -105,7 +105,7 @@
     %return-value
   (index %index))
 
-(defcfun ("git_index_has_conflicts" git-index-has-conflicts)
+(defcfun ("git_index_has_conflicts" %git-index-has-conflicts)
     :boolean
   (index %index))
 
@@ -184,6 +184,7 @@ directory return stage 0.  Files with stages 1-3 are in conflict."
   (with-foreign-slots ((seconds nanoseconds) value (:struct git-index-time))
     (local-time:timestamp+ seconds nanoseconds :nsec)))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; Highlevel Interface
@@ -201,19 +202,19 @@ directory return stage 0.  Files with stages 1-3 are in conflict."
 (defmethod git-add ((path pathname) &key (index *git-repository-index*))
   (let ((path (if (pathname-relative-p path)
                    path
-                   (enough-namestring path (git-workdir (slot-value index 'facilitator))))))
+                   (enough-namestring path (repository-workdir (slot-value index 'facilitator))))))
     (git-add (namestring path) :index index)))
 
 (defmethod git-add ((entry list) &key (index *git-repository-index*))
   (%git-index-add index entry))
 
-(defmethod git-clear ((index index))
+(defmethod index-clear ((index index))
   "Clear contents of the index removing all entries.  Changes need to
 be written back to disk to take effect."
   (%git-index-clear index))
 
-(defmethod git-read ((index index))
-  "Update the index with objects read from disk."
+(defmethod index-refresh ((index index))
+  "Refresh the state of the index with objects read from disk."
   (%git-index-read index))
 
 (defmethod git-write ((index index))
@@ -221,26 +222,18 @@ be written back to disk to take effect."
   (%git-index-write index))
 
 (defmacro with-index ((var &optional repository-or-path) &body body)
-  "Load a repository index uses the current *GIT-REPOSITORY* as the
-current repository and sets *GIT-REPOSITORY-INDEX* as the newly opened
-index."
+  "Load an index from a repository, path or if none is specified then
+an in-memory index is used.  The newly opened index is bound to the
+variable VAR."
+  ;;TODO add gensym
   `(let ((,var ,(if repository-or-path
-                    `(git-index ,repository-or-path)
-                    `(git-index-new))))
+                    `(index ,repository-or-path)
+                    `(index-new))))
      (unwind-protect
           (progn ,@body)
-       (git-free ,var))))
+       (free ,var))))
 
-(defmacro with-repository-index (&body body)
-  "Load a repository index uses the current *GIT-REPOSITORY* as the
-current repository and sets *GIT-REPOSITORY-INDEX* as the newly opened
-index."
-  `(let ((*git-repository-index* (git-index *git-repository*)))
-     (unwind-protect
-      (progn ,@body)
-       (git-free *git-repository-index*))))
-
-(defun git-index-new ()
+(defun index-new ()
   "Create a new in-memory index that can be used to perform in memory
 operations that may not be written back to the disk."
   (with-foreign-object (index :pointer)
@@ -249,7 +242,7 @@ operations that may not be written back to the disk."
            :pointer (mem-ref index :pointer)
            :free-function #'%git-index-free)))
 
-(defmethod git-index ((path string))
+(defmethod index ((path string))
   "Open a new index in a file."
   (with-foreign-object (index :pointer)
     (%git-index-open index path)
@@ -257,9 +250,12 @@ operations that may not be written back to the disk."
            :pointer (mem-ref index :pointer)
            :free-function #'%git-index-free)))
 
-(defmethod git-index ((path pathname))
+(defmethod index ((path pathname))
   "Open a new index in a file."
-  (git-index (namestring path)))
+  (index (namestring path)))
+
+(defmethod index-conflicts-p ((index index))
+  (%git-index-has-conflicts index))
 
 (defmethod git-entry-count ((index index))
   (git-index-entry-count index))
